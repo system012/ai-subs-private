@@ -1,7 +1,8 @@
 import ollama from 'ollama'
 
 const SUBTITLE_DELIMITER = '\n\n'
-// sometimes the subtitles are separated by \r\n\r\n
+const LINE_DELIMITER = '\n'
+const LINE_REGEX = /\d+\n[\s\S]*?(?=(\n\d+\n|$))/g
 
 async function main() {
     // get argument from command line
@@ -19,7 +20,9 @@ async function main() {
 
     // read file
     const sourceSubs = await readFile(inputPath)
-    let subtitles: string[] = sourceSubs.split(SUBTITLE_DELIMITER)
+    const normalizedSubs = sourceSubs.replace(/\r\n/g, '\n')
+
+    let subtitles: string[] = normalizedSubs.split(SUBTITLE_DELIMITER)
     let newSubtitles = ''
 
     if (resumeFromFile) {
@@ -36,8 +39,9 @@ async function main() {
 
     for (const subtitle of subtitles) {
         const newCharCount = charCount + subtitle.length;
+        const subEndsWithDot = subtitle.endsWith('.')
 
-        if (newCharCount > 1000) {
+        if (newCharCount > 1000 && subEndsWithDot) {
             // Generate translations for the current chunk
             const { translated, error } = await translate({ chunk, subtitles: newSubtitles });
             if (error) {
@@ -52,11 +56,11 @@ async function main() {
             writeFile(outputPath, newSubtitles)
 
             // Start a new chunk with the current subtitle
-            chunk = subtitle + SUBTITLE_DELIMITER;
+            chunk = subtitle + SUBTITLE_DELIMITER
             charCount = subtitle.length;
         } else {
             // Add the subtitle to the current chunk
-            chunk += subtitle + SUBTITLE_DELIMITER;
+            chunk += subtitle + SUBTITLE_DELIMITER
             charCount = newCharCount;
         }
     }
@@ -97,19 +101,20 @@ function validate(chunk: string, originalChunk: string, previousChunks: string) 
     const trimmedContent = chunk.trim()
 
     // split lines by number followed by \n.
-    const lines = trimmedContent.match(/\d+\n[\s\S]*?(?=(\n\d+\n|$))/g);
+    const lines = trimmedContent.match(LINE_REGEX)
     if (!lines) {
         console.error('No lines found. Sequence is not valid.')
+        console.log('Content:', [trimmedContent])
         return false
     }
     
     let lineNumber = 0
-    const originalSubLines = originalChunk.match(/\d+\n[\s\S]*?(?=(\n\d+\n|$))/g) ?? []
-    const previousSubLines = previousChunks.match(/\d+\n[\s\S]*?(?=(\n\d+\n|$))/g) ?? []
+    const originalSubLines = originalChunk.match(LINE_REGEX) ?? []
+    const previousSubLines = previousChunks.match(LINE_REGEX) ?? []
 
     for (const [index, line] of lines.entries()) {
         // for each line, check that the first element is a number
-        const splitLine = line.split('\n')
+        const splitLine = line.split(LINE_DELIMITER)
         const firstElement = parseInt(splitLine[0])
         const isNumber = !isNaN(firstElement)
         if (!isNumber) {
@@ -118,11 +123,14 @@ function validate(chunk: string, originalChunk: string, previousChunks: string) 
         }
         // check if the number is sequentially after the previousChunk
         // e.g. if the previous chunk ends with 10, the next chunk should start with 11
-        const previousSubLastLine = previousSubLines.at(-1)
-        const previousSubLastLineNumber = parseInt(previousSubLastLine && previousSubLastLine.split('\n')[0] || '0')
-        if (index === 0 && firstElement !== previousSubLastLineNumber + 1) {
-            console.error('Line number is not sequential after the previous chunk. Sequence is not valid.', { chunkFirstNumber: firstElement, peviousSubLastNumber: previousSubLastLineNumber })
-            return false
+        if (index === 0 && previousChunks.length > 0) {
+            const previousLine = previousSubLines[previousSubLines.length - 1]
+            const previousLineSplit = previousLine.split(LINE_DELIMITER)
+            const previousFirstElement = parseInt(previousLineSplit[0])
+            if (previousFirstElement !== 0 && firstElement !== previousFirstElement + 1) {
+                console.error('Line number is not sequential after the previous chunk. Sequence is not valid.', { previousFirstElement, firstElement, previousChunk: previousLine, currentChunk: line })
+                return false
+            }
         }
         // check if the number is sequential
         if (lineNumber !== 0 && firstElement !== lineNumber) {
@@ -204,9 +212,9 @@ async function generate(content: string) {
             DO NOT change the structure of the text.
             DO NOT say anything else.`,
             prompt: content,
-            // options: {
-            //     temperature: 0.5,
-            // }
+            options: {
+                temperature: 0.5,
+            }
         })
         return response.response
     } catch (error) {
