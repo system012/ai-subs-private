@@ -39,7 +39,7 @@ async function main() {
 
         if (newCharCount > 1000) {
             // Generate translations for the current chunk
-            const { translated, error } = await translate({ chunk });
+            const { translated, error } = await translate({ chunk, subtitles: newSubtitles });
             if (error) {
                 console.error('Error generating translations', { currentLength: newSubtitles.length, currentChunk: chunk })
                 console.log('Writing file to save progress...')
@@ -62,7 +62,7 @@ async function main() {
     }
 
     // Generate translations for the remaining chunk (which will be less than 1000 characters)
-    const { translated, error } = await translate({ chunk });
+    const { translated, error } = await translate({ chunk, subtitles: newSubtitles });
     if (error) {
         console.error('Error generating translations', { currentLength: newSubtitles.length, currentChunk: subtitles.length })
         console.log('Writing file to save progress...')
@@ -93,8 +93,8 @@ function writeFile(path: string, content: string): void {
     }
 }
 
-function validate(content: string, originalContent: string) {
-    const trimmedContent = content.trim()
+function validate(chunk: string, originalChunk: string, previousChunks: string) {
+    const trimmedContent = chunk.trim()
 
     // split lines by number followed by \n.
     const lines = trimmedContent.match(/\d+\n[\s\S]*?(?=(\n\d+\n|$))/g);
@@ -102,25 +102,34 @@ function validate(content: string, originalContent: string) {
         console.error('No lines found. Sequence is not valid.')
         return false
     }
-
+    
     let lineNumber = 0
-    const originalSubLines = originalContent.match(/\d+\n[\s\S]*?(?=(\n\d+\n|$))/g) ?? []
+    const originalSubLines = originalChunk.match(/\d+\n[\s\S]*?(?=(\n\d+\n|$))/g) ?? []
+    const previousSubLines = previousChunks.match(/\d+\n[\s\S]*?(?=(\n\d+\n|$))/g) ?? []
 
     for (const [index, line] of lines.entries()) {
         // for each line, check that the first element is a number
         const splitLine = line.split('\n')
-        const firstElement = splitLine[0]
-        const isNumber = !isNaN(parseInt(firstElement))
+        const firstElement = parseInt(splitLine[0])
+        const isNumber = !isNaN(firstElement)
         if (!isNumber) {
             console.error('First element is not a number. Sequence is not valid.', { firstElement })
             return false
         }
-        // check if the number is sequential
-        if (lineNumber !== 0 && parseInt(firstElement) !== lineNumber) {
-            console.error('Line number is not sequential. Sequence is not valid.', { lineNumber: parseInt(firstElement), firstElement })
+        // check if the number is sequentially after the previousChunk
+        // e.g. if the previous chunk ends with 10, the next chunk should start with 11
+        const previousSubLastLine = previousSubLines.at(-1)
+        const previousSubLastLineNumber = parseInt(previousSubLastLine && previousSubLastLine.split('\n')[0] || '0')
+        if (index === 0 && firstElement !== previousSubLastLineNumber + 1) {
+            console.error('Line number is not sequential after the previous chunk. Sequence is not valid.', { chunkFirstNumber: firstElement, peviousSubLastNumber: previousSubLastLineNumber })
             return false
         }
-        lineNumber = parseInt(firstElement) + 1
+        // check if the number is sequential
+        if (lineNumber !== 0 && firstElement !== lineNumber) {
+            console.error('Line number is not sequential. Sequence is not valid.', { lineNumber: firstElement, firstElement })
+            return false
+        }
+        lineNumber = firstElement + 1
 
         // check if the second element is a valid timecode
         const timecode = splitLine[1]
@@ -150,9 +159,10 @@ function processResponse(content: string) {
     return content.trim()
 }
 
-async function translate({ chunk, attempts = 0, maxAttempts = 100 }:
-    { chunk: string, attempts?: number, maxAttempts?: number } = {
+async function translate({ chunk, subtitles, attempts = 0, maxAttempts = 100 }:
+    { chunk: string, subtitles: string, attempts?: number, maxAttempts?: number } = {
         chunk: "",
+        subtitles: "",
         attempts: 0,
         maxAttempts: 3
     }): Promise<{
@@ -162,7 +172,7 @@ async function translate({ chunk, attempts = 0, maxAttempts = 100 }:
     // recursively translate the subtitles if content is not valid
     console.log('Generating response...')
     const translated = await generate(chunk)
-    const isValid = validate(translated, chunk)
+    const isValid = validate(translated, chunk, subtitles)
 
     if (!isValid) {
         if (attempts >= maxAttempts) {
@@ -171,7 +181,7 @@ async function translate({ chunk, attempts = 0, maxAttempts = 100 }:
         }
         console.error('Response is not valid. Retrying...', attempts + 1, ' out of ', maxAttempts)
         console.log('Response:', translated)
-        return translate({ chunk, attempts: attempts + 1, maxAttempts })
+        return translate({ chunk, subtitles, attempts: attempts + 1, maxAttempts })
     }
 
     console.log('Response generated')
