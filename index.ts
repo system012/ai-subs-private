@@ -112,6 +112,11 @@ function validate(chunk: string, originalChunk: string, previousChunks: string) 
     const originalSubLines = originalChunk.match(LINE_REGEX) ?? []
     const previousSubLines = previousChunks.match(LINE_REGEX) ?? []
 
+    if (originalSubLines.length !== lines.length) {
+        console.error('Number of lines do not match original subtitle. Sequence is not valid.', { originalLength: originalSubLines.length, newLength: lines.length })
+        return false
+    }
+
     for (const [index, line] of lines.entries()) {
         // for each line, check that the first element is a number
         const splitLine = line.split(LINE_DELIMITER)
@@ -213,7 +218,7 @@ async function generate(content: string) {
             DO NOT say anything else.`,
             prompt: content,
             options: {
-                temperature: 0.5,
+                temperature: 0.7,
             }
         })
         return response.response
