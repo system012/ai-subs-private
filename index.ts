@@ -36,11 +36,10 @@ async function main() {
 
     let chunk = "";
     let charCount = 0;
-    let subEndsWithDot = false
+    let isChunkEnd = false
 
     for (const subtitle of subtitles) {
-
-        if (charCount > 1000 && subEndsWithDot) {
+        if (charCount > 900 && isChunkEnd) {
             // Generate translations for the current chunk
             const { translated, error } = await translate({ chunk, subtitles: newSubtitles });
             if (error) {
@@ -57,12 +56,12 @@ async function main() {
             // Start a new chunk with the current subtitle, because we just translated the previous chunk
             chunk = subtitle + SUBTITLE_DELIMITER
             charCount = subtitle.length;
-            subEndsWithDot = subtitle.endsWith('.')
+            isChunkEnd = subtitle.endsWith('.') || subtitle.endsWith('!') || subtitle.endsWith(')')
         } else {
             // Add the subtitle to the current chunk
             chunk += subtitle + SUBTITLE_DELIMITER
-            charCount += subtitle.length;
-            subEndsWithDot = subtitle.endsWith('.')
+            charCount = chunk.length;
+            isChunkEnd = subtitle.endsWith('.') || subtitle.endsWith('!') || subtitle.endsWith(')')
         }
     }
 
@@ -111,11 +110,10 @@ function validate(chunk: string, originalChunk: string, previousChunks: string) 
 
     let lineNumber = 0
     const originalSubLines = originalChunk.match(LINE_REGEX) ?? []
-    // const previousSubLines = previousChunks.match(LINE_REGEX) ?? []
 
     if (originalSubLines.length !== lines.length) {
         console.error('Number of lines do not match original subtitle. Sequence is not valid.', { originalLength: originalSubLines.length, newLength: lines.length })
-        return { isValid: false, promptAddendum: 'Make sure to be ACCURATE and NOT MISS ANY line number' }
+        return { isValid: false, promptAddendum: 'DOUBLE CHECK if all lines are accounted for but DO NOT say anything about it' }
     }
 
     for (const [index, line] of lines.entries()) {
