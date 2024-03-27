@@ -155,9 +155,30 @@ function validate(chunk: string, originalChunk: string, previousChunks: string) 
     return { isValid: true, promptAddendum: '' }
 }
 
-function processResponse(content: string) {
+function processResponse(content: string, originalChunk: string) {
     // trim spaces
-    return content.trim()
+    const trimmedContent = content.trim()
+    const lines = trimmedContent.match(LINE_REGEX) ?? []
+    const originalSubLines = originalChunk.match(LINE_REGEX) ?? []
+
+    let processed = ''
+    for (const [index, line] of lines.entries()) {
+        const originalLine = originalSubLines[index]
+        const splitLine = line.split(LINE_DELIMITER)
+        const splitOriginalLine = originalLine.split(LINE_DELIMITER)
+        
+        // replace timecode with original one
+        const timecode = splitOriginalLine[1]
+        splitLine[1] = timecode
+
+        // join the line back
+        processed += splitLine.join(LINE_DELIMITER)
+
+        // add line delimiter
+        processed += LINE_DELIMITER
+    }
+
+    return processed + LINE_DELIMITER
 }
 
 async function translate({ chunk, subtitles, promptAddendum = "", attempts = 0, maxAttempts = 100 }:
@@ -187,9 +208,9 @@ async function translate({ chunk, subtitles, promptAddendum = "", attempts = 0, 
     }
 
     console.log('Response generated')
-    const processed = processResponse(translated)
+    const processed = processResponse(translated, chunk)
 
-    return { translated: processed + SUBTITLE_DELIMITER, error: false }
+    return { translated: processed, error: false }
 }
 
 async function generate(content: string, promptAddendum = "") {
