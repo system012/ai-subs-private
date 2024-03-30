@@ -2,7 +2,7 @@ import ollama from 'ollama'
 
 const SUBTITLE_DELIMITER = '\n\n'
 const LINE_DELIMITER = '\n'
-const LINE_REGEX = /\d+\n[\s\S]*?(?=(\n\d+\n|$))/g
+const LINE_REGEX = /(\d+\n\d{2}:\d{2}:\d{2},\d{3} --> \d{2}:\d{2}:\d{2},\d{3}\n[\s\S]*?)(?=(\n\d+\n\d{2}:\d{2}:\d{2},\d{3} --> \d{2}:\d{2}:\d{2},\d{3}\n|$))/g;
 
 async function main() {
     // get argument from command line
@@ -39,7 +39,7 @@ async function main() {
     let isChunkEnd = false
 
     for (const subtitle of subtitles) {
-        if (charCount > 900 && isChunkEnd) {
+        if (charCount > 800 && isChunkEnd) {
             // Generate translations for the current chunk
             const { translated, error } = await translate({ chunk, subtitles: newSubtitles });
             if (error) {
@@ -166,7 +166,7 @@ function processResponse(content: string, originalChunk: string) {
         const originalLine = originalSubLines[index]
         const splitLine = line.split(LINE_DELIMITER)
         const splitOriginalLine = originalLine.split(LINE_DELIMITER)
-        
+
         // replace timecode with original one
         const timecode = splitOriginalLine[1]
         splitLine[1] = timecode
@@ -181,11 +181,12 @@ function processResponse(content: string, originalChunk: string) {
     return processed + LINE_DELIMITER
 }
 
-async function translate({ chunk, subtitles, promptAddendum = "", attempts = 0, maxAttempts = 100 }:
-    { chunk: string, subtitles: string, promptAddendum?: string, attempts?: number, maxAttempts?: number } = {
+async function translate({ chunk, subtitles, promptAddendum = "", temperature = 0.7, attempts = 0, maxAttempts = 100 }:
+    { chunk: string, subtitles: string, promptAddendum?: string, temperature?: number, attempts?: number, maxAttempts?: number } = {
         chunk: "",
         subtitles: "",
         promptAddendum: "",
+        temperature: 0.7,
         attempts: 0,
         maxAttempts: 3
     }): Promise<{
@@ -193,18 +194,22 @@ async function translate({ chunk, subtitles, promptAddendum = "", attempts = 0, 
         error: boolean
     }> {
     console.log('Generating response...')
-    const translated = await generate(chunk, promptAddendum)
+    const translated = await generate(chunk, promptAddendum, temperature)
     const { isValid, promptAddendum: prompt } = validate(translated, chunk, subtitles)
 
     // recursively translate the subtitles if content is not valid
     if (!isValid) {
+        const addendum = createRandomPromptAddendum(attempts)
+        const temperature = adjustTemperature(attempts)
         if (attempts >= maxAttempts) {
             console.error('Max attempts reached')
             return { translated, error: true }
         }
         console.error('Response is not valid. Retrying...', attempts + 1, ' out of ', maxAttempts)
         console.log('Response:', translated)
-        return translate({ chunk, subtitles, promptAddendum: prompt + '!'.repeat(attempts), attempts: attempts + 1, maxAttempts })
+        return translate({
+            chunk, subtitles, promptAddendum: prompt + '\n' + addendum, temperature, attempts: attempts + 1, maxAttempts
+        })
     }
 
     console.log('Response generated')
@@ -213,7 +218,7 @@ async function translate({ chunk, subtitles, promptAddendum = "", attempts = 0, 
     return { translated: processed, error: false }
 }
 
-async function generate(content: string, promptAddendum = "") {
+async function generate(content: string, promptAddendum = "", temperature = 0.7) {
     try {
         const system = `You are a professional translator from english to italian.
             You're going to receive english subtitles in SRT format.
@@ -222,7 +227,7 @@ async function generate(content: string, promptAddendum = "") {
             DO NOT change the timecode.
             DO NOT change the line number.
             DO NOT change the structure of the text.
-            DO NOT say anything else.` + promptAddendum
+            DO NOT say anything else.` + '\n' + promptAddendum
 
         console.log('Input sent', { length: content.length, content, prompt: promptAddendum !== "" ? system : "" })
         const response = await ollama.generate({
@@ -230,7 +235,7 @@ async function generate(content: string, promptAddendum = "") {
             system,
             prompt: content,
             options: {
-                temperature: 0.7,
+                temperature
             }
         })
         return response.response
@@ -238,6 +243,27 @@ async function generate(content: string, promptAddendum = "") {
         console.error('Error generating response:', error)
         return generate(content, promptAddendum)
     }
+}
+
+function adjustTemperature(attempts: number) {
+    // adjust temperature based on the number of attempts, using the modulo operator
+    // temperatures is a range of values between 0.1 and 1.0
+    const temperatures = [0.1, 0.3, 0.5, 0.7, 0.9]
+    const index = attempts % temperatures.length
+
+    return temperatures[index]
+}
+
+function createRandomPromptAddendum(attempts: number) {
+    const prompts = [
+        "Be EXTRA careful with respecting the SRT structure.",
+        "EXTREMELY IMPORTANT: do NOT miss any dialogue.",
+        "Make sure to include ALL the lines, otherwise someone might get hurt.",
+        "DOUBLE CHECK if all lines are accounted for but DO NOT say anything about it",
+    ]
+    // rotate the prompts based on the number of attempts
+    const index = attempts % prompts.length
+    return '\n' + prompts[index]
 }
 
 main()
