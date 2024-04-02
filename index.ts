@@ -20,7 +20,7 @@ async function main() {
 
     // read file
     const sourceSubs = await readFile(inputPath)
-    const normalizedSubs = sourceSubs.replace(/\r\n/g, '\n')
+    const normalizedSubs = normalizeSubs(sourceSubs)
 
     let subtitles: string[] = normalizedSubs.split(SUBTITLE_DELIMITER)
     let newSubtitles = ''
@@ -231,7 +231,7 @@ async function generate(content: string, promptAddendum = "", temperature = 0.7)
 
         console.log('Input sent', { length: content.length, content, prompt: promptAddendum !== "" ? system : "" })
         const response = await ollama.generate({
-            model: 'mixtral:8x7b-instruct-v0.1-q3_K_M',
+            model: 'command-r:35b-v0.1-q3_K_S',
             system,
             prompt: content,
             options: {
@@ -243,6 +243,10 @@ async function generate(content: string, promptAddendum = "", temperature = 0.7)
         console.error('Error generating response:', error)
         return generate(content, promptAddendum)
     }
+}
+
+function normalizeSubs(subs: string) {
+    return subs.replace(/\r\n/g, '\n').replace(/\n\n$/, '\n')
 }
 
 function adjustTemperature(attempts: number) {
