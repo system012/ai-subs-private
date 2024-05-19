@@ -177,3 +177,4 @@ dist
 # output translation files
 
 *.srt
+/.tmp.subs
