@@ -4,7 +4,8 @@ import { translate } from '../utils/translation';
 import { SUBTITLE_DELIMITER } from '../utils/constants';
 
 parentPort?.on('message', async (data) => {
-    const { subtitles, tempFilePath } = data
+    const { subtitles, tempFilePath, index } = data
+    const logger = createLogger(index)
     let chunk = "";
     let charCount = 0;
     let isChunkEnd = false
@@ -12,7 +13,7 @@ parentPort?.on('message', async (data) => {
     const subChunks = subtitles.slice(newSubtitles.split(SUBTITLE_DELIMITER).length - 1)
 
     if (newSubtitles.length > 0) {
-        console.log('Resuming translation...')
+        logger.log('Resuming translation')
     }
 
     console.time('translation ' + tempFilePath)
@@ -20,16 +21,16 @@ parentPort?.on('message', async (data) => {
     for (const subtitle of subChunks) {
         if (charCount > 600 && isChunkEnd) {
             // Generate translations for the current chunk
-            console.log('Generating translations... ' + 'worker: ' + tempFilePath)
+            logger.log('Generating translations... ' + tempFilePath)
             const { translated, error } = await translate({ chunk });
             if (error) {
-                console.error('Error generating translations')
-                console.log('Writing file to save progress...')
+                logger.error('Error generating translations')
+                logger.log('Writing file to save progress...')
                 writeFile(tempFilePath, newSubtitles)
                 console.timeEnd('translation')
                 return
             }
-            console.log('\nTranslations generated for file:', tempFilePath)
+            logger.log('\nTranslations generated for file: ' + tempFilePath)
             newSubtitles += translated
             writeFile(tempFilePath, newSubtitles)
 
@@ -48,23 +49,30 @@ parentPort?.on('message', async (data) => {
     if (chunk.length > 0) {
         const { translated, error } = await translate({ chunk });
         if (error) {
-            console.error('Error generating translations', { currentLength: newSubtitles.length, currentChunk: subtitles.length })
-            console.log('Writing file to save progress...')
+            logger.error('Error generating translations' + { currentLength: newSubtitles.length, currentChunk: subtitles.length })
+            logger.log('Writing file to save progress...')
             writeFile(tempFilePath, newSubtitles)
             console.timeEnd('translation')
             return
         }
-        console.log('Translations generated')
+        logger.log('Translations generated')
         newSubtitles += translated
 
         // write file
-        console.log('Writing file...')
+        logger.log('Writing file...')
         writeFile(tempFilePath, newSubtitles)
-        console.log('File written')
+        logger.log('File written')
     }
 
     console.timeEnd('translation ' + tempFilePath)
 
-    console.log('Sending translations to main thread...')
+    logger.log('Sending translations to main thread...')
     parentPort?.postMessage(newSubtitles)
 })
+
+function createLogger(index: number) {
+    return {
+        log: (msg: string) => console.log(`[worker ${index}] ${msg}`),
+        error: (msg: string) => console.error(`[worker ${index}] ${msg}`)
+    }
+}

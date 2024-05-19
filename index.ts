@@ -27,7 +27,7 @@ async function main() {
 
     const promises = workers.map(worker => {
         return new Promise<string>((resolve, reject) => {
-            worker.worker.postMessage({ subtitles: worker.chunk, tempFilePath: `${process.cwd()}/.tmp.subs/${outputPath.split('/').pop()}.tmp${worker.index}` });
+            worker.worker.postMessage({ subtitles: worker.chunk, tempFilePath: `${process.cwd()}/.tmp.subs/${outputPath.split('/').pop()}.tmp${worker.index}`, index: worker.index });
             worker.worker.on('message', (translation) => {
                 console.log('[main thread] subtitles received')
                 worker.worker.terminate();

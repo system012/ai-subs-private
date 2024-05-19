@@ -142,15 +142,17 @@ function validate(chunk: string, originalChunk: string) {
 
         // check if the whole line is not more than double or less than half the length of the original subtitle
         const originalLine = originalSubLines[index]
-        // const originalLineLength = originalLine.length
-        // const splitLineLength = line.length
-        const text = splitLine.slice(2).reduce((acc, sub) => { acc += sub; return acc }, '')
-        const originalText = originalLine.split(LINE_DELIMITER).slice(2).reduce((acc, sub) => { acc += sub; return acc }, '')
-        const textLength = text.length
-        const originalTextLength = originalText.length
-        const moreThanTriple = textLength > originalTextLength * 3
-        const lessThanThird = textLength < originalTextLength / 3
-        const isWithinRange = !moreThanTriple && !lessThanThird
+        const originalTextArray = originalLine.trim().match(LINE_REGEX)?.slice(2)
+        const originalText = originalTextArray?.reduce((acc, sub) => { acc += sub; return acc }, '') ?? ''
+        const originalTextWords = originalTextArray?.length ?? 0
+
+        const currentTextArray = line.trim().match(LINE_REGEX)?.slice(2)
+        // const currentText = currentTextArray?.reduce((acc, sub) => { acc += sub; return acc }, '') ?? ''
+        const currentTextWords = currentTextArray?.length ?? 0
+
+        const isTooLong = originalTextWords > currentTextWords * 1.8
+        const isTooShort = originalTextWords < currentTextWords * 0.5
+        // for some reason, the LLM sometimes changes this symbol to [music] or something similar
         const exceptions = ['♪']
 
         if (exceptions.includes(originalText)) {
@@ -158,14 +160,14 @@ function validate(chunk: string, originalChunk: string) {
             continue
         }
 
-        if (!isWithinRange) {
+        if (isTooLong || isTooShort) {
             console.error('Line length is not within range. Sequence is not valid.', {
-                originalTextLength,
-                textLength,
-                originalSub: originalLine.split(LINE_DELIMITER).slice(2).reduce((acc, sub) => { acc += sub; return acc }, ''),
-                newSub: splitLine.slice(2).reduce((sub, acc) => { acc += sub; return acc }, ''),
-                moreThanTriple,
-                lessThanHalf: lessThanThird
+                originalTextLength: originalTextWords,
+                textLength: currentTextWords,
+                originalSub: originalTextArray,
+                newSub: currentTextArray,
+                isTooLong,
+                isTooShort
             })
             return { isValid: false, promptAddendum: `Translate the dialogue number ${firstElement} FAITHFULLY to the original language, without adding or removing anything.` }
         }
