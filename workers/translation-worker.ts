@@ -30,6 +30,7 @@ parentPort?.on('message', async (data) => {
                 console.timeEnd('translation')
                 return
             }
+
             logger.log('\nTranslations generated for file: ' + tempFilePath)
             newSubtitles += translated
             writeFile(tempFilePath, newSubtitles)

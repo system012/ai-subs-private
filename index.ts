@@ -1,10 +1,7 @@
-
-
 import { Worker } from 'worker_threads';
 import { readFile, writeFile } from './utils/io';
 import { normalizeSubs } from './utils/normalize';
 import { splitIntoChunks } from './utils/splitIntoChunks';
-// import { SUBTITLE_DELIMITER } from './utils/constants';
 
 async function main() {
     // get argument from command line
