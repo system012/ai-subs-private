@@ -1,8 +1,11 @@
+import { LINE_DELIMITER } from "../utils/constants";
+
 export type Timecode = `${number}:${number}:${number},${number} --> ${number}:${number}:${number},${number}`;
 export type SubtitleT = {
     lineNumber: number;
     timecode: Timecode;
     text: string[];
+    toString(): string;
 }
 
 export class Subtitle implements SubtitleT {
@@ -12,7 +15,11 @@ export class Subtitle implements SubtitleT {
         this.text = text;
      }
 
+    get size(): number {
+        return this.text.join(LINE_DELIMITER).length;
+    }
+
     toString(): string {
-        return `${this.lineNumber}\n${this.timecode}\n${this.text.join('\n')}`;
+        return `${this.lineNumber}\n${this.timecode}\n${this.text.join(LINE_DELIMITER)}`;
     }
 }

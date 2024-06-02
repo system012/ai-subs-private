@@ -9,28 +9,28 @@ export type SubtitleCallbackArguments<T> = {
     result?: SubtitleCallbackReturn<T>
 }
 export type SubtitleCallbackReturn<T> = {
-    ok: boolean
+    type: 'error' | 'success'
     value: T
     message?: Error
 }
 export type SubtitleCallbackFunction<T> = (args: SubtitleCallbackArguments<T>) => SubtitleCallbackReturn<T>
 
 type SubtitleError = {
-    error: true,
     message: Error
-    value?: undefined
+    value?: undefined,
+    type: 'error'
 }
 type SubtitleReturnValue = {
-    error: false,
     value: SubtitleT[]
+    type: 'success'
 }
-type SubtitleResult = SubtitleError | SubtitleReturnValue;
+export type SubtitleResult = SubtitleError | SubtitleReturnValue;
 
 export function createSubtitles(subtitleText: string): SubtitleResult {
-    const rawSubs = subtitleText.trim().match(LINE_REGEX);
+    const rawSubs = subtitleText.match(LINE_REGEX);
     if (!rawSubs || (rawSubs?.length ?? 0) === 0) {
         return {
-            error: true,
+            type: 'error',
             message: new Error('No lines found in subtitle text. The structure might not be valid.')
         }
     }
@@ -40,40 +40,40 @@ export function createSubtitles(subtitleText: string): SubtitleResult {
         const result = createSubtitle(line);
         if (isSubtitleError(result)) {
             return {
-                error: true,
+                type: 'error',
                 message: result.message
             };
         }
-        subtitles.push(result);
+        subtitles.push(result.value);
     }
 
     return {
-        error: false,
+        type: 'success',
         value: subtitles
     }
 }
 
 export function iterateSubtitles<T>(subtitles: SubtitleT[], originalSubs: SubtitleT[], callbacks: SubtitleCallbackFunction<T>[]): SubtitleCallbackReturn<T> {
     let prevSubtitle: SubtitleT = { lineNumber: 0, timecode: '00:00:00,000 --> 00:00:00,000', text: [] };
-    let result: ReturnType<SubtitleCallbackFunction<T>> = { ok: true, value: "" as T };
+    let result: ReturnType<SubtitleCallbackFunction<T>> = { type: 'success', value: "" as T };
 
     for (const [index, subtitle] of subtitles.entries()) {
         for (const callback of callbacks) {
             const originalSub = originalSubs[index];
             result = callback({ subtitle, index, prevSubtitle, originalSub, result });
-            if (!result.ok) return result
+            if (result.type === 'error') return result
         }
         prevSubtitle = subtitle
     }
 
     return result
 }
-export function createSubtitle(line: string): SubtitleT | SubtitleError {
+export function createSubtitle(line: string): { value: SubtitleT, type: 'success' } | SubtitleError {
     const [lineNumber, timecode, ...text] = line.split(LINE_DELIMITER);
     const lineToNumber = parseInt(lineNumber)
     if (isNaN(lineToNumber)) {
         return {
-            error: true,
+            type: 'error',
             message: new Error('[createSubtitle] First element is not a number.')
         }
     }
@@ -82,17 +82,26 @@ export function createSubtitle(line: string): SubtitleT | SubtitleError {
     const isValidTimecode = timecodeRegex.test(timecode);
 
     if (!isValidTimecode) return {
-        error: true,
+        type: 'error',
         message: new Error('[createSubtitle] Second element is not a timecode.')
     }
     if (text.length === 0) return {
-        error: true,
+        type: 'error',
         message: new Error('[createSubtitle] Text is missing.')
     }
 
-    return new Subtitle(lineToNumber, timecode as Timecode, text);
+    const textWithoutEmptyElements = text?.at(-1) === '' ? text.slice(0, -1) : text;
+
+    return {
+        type: 'success',
+        value: new Subtitle(lineToNumber, timecode as Timecode, textWithoutEmptyElements)
+    }
 }
 
-function isSubtitleError(sub: SubtitleT | SubtitleError): sub is SubtitleError {
-    return 'error' in sub && sub.error;
+function isSubtitleError(sub: ReturnType<typeof createSubtitle>): sub is SubtitleError {
+    return sub.type === 'error'
+}
+
+export function isDialogueOver(word: string): boolean {
+    return (word?.at(-1) === '.' || word?.at(-1) === '!' || word?.at(-1) === ')')
 }

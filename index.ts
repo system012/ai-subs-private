@@ -1,7 +1,8 @@
 import { Worker } from 'worker_threads';
 import { readFile, writeFile } from './utils/io';
 import { normalizeSubs } from './utils/normalize';
-import { splitIntoChunks } from './utils/splitIntoChunks';
+import { createWorkerChunks } from './utils/create-worker-chunk';
+import type { WorkerData } from './workers/translation-worker';
 
 async function main() {
     // get argument from command line
@@ -19,12 +20,21 @@ async function main() {
 
     const data = await readFile(inputPath);
     const normalizedData = normalizeSubs(data);
-    const chunks = splitIntoChunks(normalizedData, workersCount);
+    const { type, value: chunks, message } = createWorkerChunks(normalizedData, workersCount);
+    if (type === 'error') {
+        console.error('Error creating workers chunks', message)
+        return
+    }
     const workers = chunks.map((chunk, index) => ({ worker: new Worker('./workers/translation-worker.ts'), chunk, index }));
 
     const promises = workers.map(worker => {
         return new Promise<string>((resolve, reject) => {
-            worker.worker.postMessage({ subtitles: worker.chunk, tempFilePath: `${process.cwd()}/.tmp.subs/${outputPath.split('/').pop()}.tmp${worker.index}`, index: worker.index });
+            const workerData: WorkerData = { 
+                rawSubtitles: worker.chunk,
+                tempFilePath: `${process.cwd()}/.tmp.subs/${outputPath.split('/').pop()}.tmp${worker.index}`,
+                index: worker.index
+            }
+            worker.worker.postMessage(workerData);
             worker.worker.on('message', (translation) => {
                 console.log('[main thread] subtitles received')
                 worker.worker.terminate();

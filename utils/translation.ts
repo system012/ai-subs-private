@@ -1,30 +1,27 @@
 import ollama from 'ollama'
-import { createSubtitles, iterateSubtitles, type SubtitleCallbackArguments } from './subtitles'
+import { createSubtitles, iterateSubtitles, type SubtitleCallbackArguments, type SubtitleResult } from './subtitles'
 import { validate } from './validation'
 import { Subtitle } from '../entities/subtitle'
+import { Chunk } from '../entities/chunk'
 
 export async function translate({ chunk, promptAddendum = "", temperature = 0.7, attempts = 0, maxAttempts = 100 }:
-    { chunk: string, promptAddendum?: string, temperature?: number, attempts?: number, maxAttempts?: number } = {
-        chunk: "",
-        promptAddendum: "",
-        temperature: 0.7,
-        attempts: 0,
-        maxAttempts: 3
-    }): Promise<{
+    { chunk: Chunk, promptAddendum?: string, temperature?: number, attempts?: number, maxAttempts?: number }): Promise<{
         translated: string,
-        error: boolean
+        type: 'error' | 'success'
     }> {
-    const translated = await generate(chunk, promptAddendum, temperature)
-    const { ok, value: prompt } = validate(translated, chunk)
+    const translated = await generate(chunk.data, promptAddendum, temperature)
+    const translatedSubsResult = createSubtitles(translated)
+    const originalSubResult = createSubtitles(chunk.data)
+    const { type, value: prompt } = validate(translatedSubsResult, originalSubResult)
 
     // recursively translate the subtitles if content is not valid
-    if (!ok) {
+    if (type === 'error') {
         const temperature = adjustTemperature(attempts)
         const promptAddendum = prompt ? (prompt + '\n') : ''
 
         if (attempts >= maxAttempts) {
             console.error('Max attempts reached')
-            return { translated, error: true }
+            return { translated, type: 'error' }
         }
 
         console.error('Response is not valid. Retrying...', attempts + 1, ' out of ', maxAttempts)
@@ -34,12 +31,12 @@ export async function translate({ chunk, promptAddendum = "", temperature = 0.7,
         })
     }
 
-    const processed = processResponse(translated, chunk)
-    if (!processed.ok) {
-        return { translated, error: true }
+    const processed = processResponse(translatedSubsResult, originalSubResult)
+    if (processed.type === 'error') {
+        return { translated, type: 'error' }
     }
 
-    return { translated: processed.value, error: false }
+    return { translated: processed.value, type: 'success' }
 }
 
 export async function generate(content: string, promptAddendum = "", temperature = 0.7) {
@@ -86,24 +83,23 @@ function adjustTemperature(attempts: number) {
     return temperatures[index]
 }
 
-function processResponse(currentSub: string, originalChunk: string) {
-    const { error, value: subtitles } = createSubtitles(currentSub)
-    if (error) {
-        console.error('Error processing new sub. Sub is invalid:\n', error)
+function processResponse(currentSub: SubtitleResult, originalChunk: SubtitleResult) {
+    if (currentSub.type === 'error') {
+        console.error('Error processing new sub. Sub is invalid:\n', currentSub.message)
         return {
-            ok: false,
+            type: 'error',
             value: ""
         }
     }
-
-    const { error: originalSubError, value: originalSubs } = createSubtitles(originalChunk)
-    if (originalSubError) {
-        console.error('Error processing original sub. Sub is invalid:\n', originalSubs)
+    if (originalChunk.type === 'error') {
+        console.error('Error processing original sub. Sub is invalid:\n', originalChunk.message)
         return {
-            ok: false,
+            type: 'error',
             value: ""
         }
     }
+    const { value: subtitles } = currentSub
+    const { value: originalSubs } = originalChunk
 
     const processSubtitle = ({ subtitle, originalSub, result }: SubtitleCallbackArguments<string>) => {
         try {
@@ -111,13 +107,13 @@ function processResponse(currentSub: string, originalChunk: string) {
             const normalizedLastLine = (text.at(-1)?.trim() ?? '') + '\n\n'
             const sub = new Subtitle(subtitle.lineNumber, originalSub.timecode, [...text.slice(0, -1), normalizedLastLine])
 
-            if (!result) result = { ok: true, value: "" }
+            if (!result) result = { type: 'success', value: "" }
             result.value += sub.toString()
 
             return result
         } catch (error) {
             return {
-                ok: false,
+                type: 'error' as const,
                 value: "",
                 message: error as Error
             }
@@ -125,17 +121,17 @@ function processResponse(currentSub: string, originalChunk: string) {
     }
 
     const result = iterateSubtitles(subtitles, originalSubs, [processSubtitle])
-    if (!result.ok) {
+    if (result.type === 'error') {
         console.error('Error processing subtitles. Couldn\'t process it: \n', result.message)
         return {
             value: "",
-            ok: false
+            type: 'error'
         }
     }
 
     return {
         value: result.value,
-        ok: true
+        type: 'success'
     }
 }
 
