@@ -18,7 +18,7 @@ parentPort?.on('message', async (data: WorkerData) => {
     const savedSubtitles = await fileExists(tempFilePath) && await readFile(tempFilePath) || ''
     savedSubtitles.length > 0 && logger.log('Resuming translation')
 
-    const { type, value: savedSubs } = savedSubtitles.length > 0 ? createSubtitles(savedSubtitles) : { type: 'error', value: [] } as const
+    const { type, value: savedSubs } = savedSubtitles.length > 0 ? createSubtitles(savedSubtitles) : { type: 'success', value: [] } as const
     if (type === 'error') {
         logger.error('Error processing new sub. Sub is invalid')
         return
