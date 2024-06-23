@@ -2,54 +2,52 @@ import { LINE_DELIMITER, DEFAULT_MAX_CHUNK_SIZE } from "../utils/constants";
 import { isDialogueOver } from "../utils/subtitles";
 
 export class Chunk {
-    public data: string = ''
-    private maxSize: number = DEFAULT_MAX_CHUNK_SIZE
+  public data: string = "";
+  private maxSize: number = DEFAULT_MAX_CHUNK_SIZE;
 
-    constructor() {
-    }
+  constructor() {}
 
-    get size() {
-        return this.data.length;
-    }
+  get size() {
+    return this.data.length;
+  }
 
-    append(data: string) {
-        this.data += data + LINE_DELIMITER
-    }
+  append(data: string) {
+    this.data += data + LINE_DELIMITER;
+  }
 
-    isChunkFull() {
-        return this.size > this.maxSize && isDialogueOver(this.data.trimEnd())
-    }
+  isChunkFull() {
+    return this.size > this.maxSize && isDialogueOver(this.data.trimEnd());
+  }
 
-    withMaxSize(size: number) {
-        this.maxSize = size
-        return this
-    }
+  withMaxSize(size: number) {
+    this.maxSize = size;
+    return this;
+  }
 }
 
 export class ArrayChunk {
-    public data: string[] = [];
-    private maxSize: number = DEFAULT_MAX_CHUNK_SIZE;
+  public data: string[] = [];
+  private maxSize: number = DEFAULT_MAX_CHUNK_SIZE;
 
-    constructor() {
-    }
+  constructor() {}
 
-    get size() {
-        return this.data.length;
-    }
+  get size() {
+    return this.data.length;
+  }
 
-    append(item: string) {
-        this.data.push(item);
-    }
+  append(item: string) {
+    this.data.push(item);
+  }
 
-    isChunkFull() {
-        const lastElement = this.data.at(-1)
-        return this.size > this.maxSize && isDialogueOver(lastElement ?? '');
-    }
+  isChunkFull() {
+    const lastElement = this.data.at(-1);
+    return this.size > this.maxSize && isDialogueOver(lastElement ?? "");
+  }
 
-    withMaxSize(size: number) {
-        this.maxSize = size;
-        return this;
-    }
+  withMaxSize(size: number) {
+    this.maxSize = size;
+    return this;
+  }
 }
 
 // export class Chunks {
