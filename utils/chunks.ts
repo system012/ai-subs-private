@@ -1,25 +1,23 @@
-import { ArrayChunk, Chunk } from "../entities/chunk";
+import { Chunk } from "../entities/chunk";
 import { DEFAULT_MAX_CHUNK_SIZE } from "./constants";
 
 type DataT = {
   toString(): string;
 };
 
-type ChunkOptions<C extends Chunk | ArrayChunk> = {
+type ChunkOptions = {
   maxSize: number;
-  ChunkClass: { new (): C };
 };
-export const createChunks = <T extends DataT, C extends Chunk | ArrayChunk>(
+export const createChunks = <T extends DataT>(
   data: T[],
-  { maxSize, ChunkClass }: ChunkOptions<C> = {
+  { maxSize }: ChunkOptions = {
     maxSize: DEFAULT_MAX_CHUNK_SIZE,
-    ChunkClass: Chunk as { new (): C },
   },
 ) => {
-  return data.reduce((chunks, sub) => {
+  return data.reduce((chunks: Chunk[], sub) => {
     const lastChunk = chunks.at(-1);
     if (!lastChunk || lastChunk?.isChunkFull()) {
-      const chunk = new ChunkClass();
+      const chunk = Chunk.create(chunks.length);
       chunk.withMaxSize(maxSize).append(sub.toString());
       chunks.push(chunk);
       return chunks;
@@ -27,5 +25,5 @@ export const createChunks = <T extends DataT, C extends Chunk | ArrayChunk>(
 
     lastChunk?.append(sub.toString());
     return chunks;
-  }, [] as C[]);
+  }, []);
 };

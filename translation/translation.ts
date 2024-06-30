@@ -4,28 +4,27 @@ import {
   iterateSubtitles,
   type SubtitleCallbackArguments,
   type SubtitleResult,
-} from "./subtitles";
-import { validate } from "./validation";
-import { Subtitle } from "../entities/subtitle";
+} from "../utils/subtitles";
+import { validate } from "../validation/validation";
+import { Subtitle, type SubtitleT } from "../entities/subtitle";
 import { Chunk } from "../entities/chunk";
+import { createLogger } from "../utils/logger";
+import { SUBTITLE_DELIMITER } from "../utils/constants";
 
 export async function translate({
   chunk,
-  promptAddendum = "",
-  temperature = 0.7,
-  attempts = 0,
-  maxAttempts = 100,
+  promptAddendum,
+  logger,
 }: {
   chunk: Chunk;
   promptAddendum?: string;
-  temperature?: number;
-  attempts?: number;
-  maxAttempts?: number;
+  logger: ReturnType<typeof createLogger>;
 }): Promise<{
-  translated: string;
-  type: "error" | "success";
+  translated: SubtitleT[];
+  type: "error" | "success" | "error-queue";
+  prompt: string;
 }> {
-  const translated = await generate(chunk.data, promptAddendum, temperature);
+  const translated = await generate(chunk.data, { logger, promptAddendum });
   const translatedSubsResult = createSubtitles(translated);
   const originalSubResult = createSubtitles(chunk.data);
   const { type, value: prompt } = validate(
@@ -33,44 +32,33 @@ export async function translate({
     originalSubResult,
   );
 
-  // recursively translate the subtitles if content is not valid
   if (type === "error") {
-    const temperature = adjustTemperature(attempts);
-    const promptAddendum = prompt ? prompt + "\n" : "";
-
-    if (attempts >= maxAttempts) {
-      console.error("Max attempts reached");
-      return { translated, type: "error" };
-    }
-
-    console.error(
-      "Response is not valid. Retrying...",
-      attempts + 1,
-      " out of ",
-      maxAttempts,
-    );
-    console.log("Response:", translated);
-    return translate({
-      chunk,
-      promptAddendum,
-      temperature,
-      attempts: attempts + 1,
-      maxAttempts,
-    });
+    return {
+      translated: [],
+      type: "error-queue",
+      prompt,
+    };
   }
 
   const processed = processResponse(translatedSubsResult, originalSubResult);
   if (processed.type === "error") {
-    return { translated, type: "error" };
+    return { translated: [], type: "error", prompt: "" };
   }
 
-  return { translated: processed.value, type: "success" };
+  return { translated: processed.value, type: "success", prompt: "" };
 }
 
 export async function generate(
   content: string,
-  promptAddendum = "",
-  temperature = 0.7,
+  {
+    logger,
+    promptAddendum = "",
+    temperature = 0.7,
+  }: {
+    logger: ReturnType<typeof createLogger>;
+    promptAddendum?: string;
+    temperature?: number;
+  },
 ) {
   try {
     const system = `You are a professional translator from english to Italian.
@@ -86,15 +74,16 @@ export async function generate(
             DO NOT say anything else.
             ${promptAddendum}`;
 
-    console.log("Input sent", {
+    logger.debug("Input sent", {
       length: content.length,
-      content,
-      prompt: promptAddendum !== "" ? system : "",
+      ...(promptAddendum !== ""
+        ? {
+            promptAddendum,
+          }
+        : {}),
     });
     const response = await ollama.generate({
       model: "mixtral:8x7b-instruct-v0.1-q3_K_M",
-      // model: 'aya:8b-23-q8_0',
-      // model: 'dolphin-llama3:8b-v2.9-q8_0',
       // model: 'llava-llama3:latest',
       system,
       prompt: content,
@@ -106,17 +95,8 @@ export async function generate(
   } catch (error) {
     console.error("Error generating response:", error);
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    return generate(content, promptAddendum);
+    return generate(content, { logger, promptAddendum, temperature });
   }
-}
-
-function adjustTemperature(attempts: number) {
-  // adjust temperature based on the number of attempts, using the modulo operator
-  // temperatures is a range of values between 0.1 and 1.0
-  const temperatures = [0.1, 0.3, 0.5, 0.7, 0.9];
-  const index = attempts % temperatures.length;
-
-  return temperatures[index];
 }
 
 function processResponse(
@@ -130,7 +110,7 @@ function processResponse(
     );
     return {
       type: "error",
-      value: "",
+      value: [],
     };
   }
   if (originalChunk.type === "error") {
@@ -140,7 +120,7 @@ function processResponse(
     );
     return {
       type: "error",
-      value: "",
+      value: [],
     };
   }
   const { value: subtitles } = currentSub;
@@ -150,23 +130,24 @@ function processResponse(
     subtitle,
     originalSub,
     result,
-  }: SubtitleCallbackArguments<string>) => {
+  }: SubtitleCallbackArguments<SubtitleT[]>) => {
     try {
       const { text } = subtitle;
-      const normalizedLastLine = (text.at(-1)?.trim() ?? "") + "\n\n";
+      const normalizedLastLine =
+        (text.at(-1)?.trim() ?? "") + SUBTITLE_DELIMITER;
       const sub = new Subtitle(subtitle.lineNumber, originalSub.timecode, [
         ...text.slice(0, -1),
         normalizedLastLine,
       ]);
 
-      if (!result) result = { type: "success", value: "" };
-      result.value += sub.toString();
+      if (!result) result = { type: "success", value: [] };
+      result.value.push(sub);
 
       return result;
     } catch (error) {
       return {
         type: "error" as const,
-        value: "",
+        value: [],
         message: error as Error,
       };
     }
@@ -179,7 +160,7 @@ function processResponse(
       result.message,
     );
     return {
-      value: "",
+      value: [],
       type: "error",
     };
   }
@@ -189,6 +170,15 @@ function processResponse(
     type: "success",
   };
 }
+
+// function adjustTemperature(attempts: number) {
+//   // adjust temperature based on the number of attempts, using the modulo operator
+//   // temperatures is a range of values between 0.1 and 1.0
+//   const temperatures = [0.1, 0.3, 0.5, 0.7, 0.9];
+//   const index = attempts % temperatures.length;
+//
+//   return temperatures[index];
+// }
 
 // function createRandomPromptAddendum(attempts: number) {
 //     const prompts = [

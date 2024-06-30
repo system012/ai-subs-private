@@ -1,68 +1,47 @@
-import { Worker } from "worker_threads";
-import { readFile, writeFile } from "./utils/io";
+import { translate } from "./translation/translation";
+import { Chunk } from "./entities/chunk";
+import { createLogger } from "./utils/logger";
+import { Project } from "./entities/project";
 import { normalizeSubs } from "./utils/normalize";
-import { createWorkerChunks } from "./utils/create-worker-chunk";
-import type { WorkerData } from "./workers/translation-worker";
+import { StateItem } from "./entities/state-item";
+import { errorProcessor } from "./utils/error-processor";
+import { getConfig } from "./config/get-config";
 
 async function main() {
   // get argument from command line
-  const inputPath = process.argv[2];
-  const outputPath = process.argv[3];
-  const workersCount = parseInt(process.argv[4] || "2");
-  if (!inputPath) {
-    console.error("Please provide a file path");
-    return;
+  const config = getConfig();
+  const logger = createLogger(config.debug);
+  const project = new Project(config.input, config.output);
+
+  project.addPreprocessors([normalizeSubs]);
+  await project.init();
+  console.time("translation");
+
+  for (const [index, chunk] of project.chunks.entries()) {
+    logger.log(
+      `Translating chunk ${index + 1} out of ${project.chunks.length}. Chunk ID: ${chunk.id}`,
+    );
+    const { translated, type, prompt } = await translate({ chunk, logger });
+    if (type === "error-queue") {
+      project.save(new StateItem(chunk, "error", prompt));
+      continue;
+    }
+    if (type === "error") {
+      logger.error("Error generating translations");
+      console.timeEnd("translation");
+      return;
+    }
+
+    project.save(
+      new StateItem(Chunk.fromSubtitles(chunk.id, translated), "done"),
+    );
   }
-  if (!outputPath) {
-    console.error("Please provide an output file path");
-    return;
-  }
 
-  const data = await readFile(inputPath);
-  const normalizedData = normalizeSubs(data);
-  const {
-    type,
-    value: chunks,
-    message,
-  } = createWorkerChunks(normalizedData, workersCount);
-  if (type === "error") {
-    console.error("Error creating workers chunks", message);
-    return;
-  }
-  const workers = chunks.map((chunk, index) => ({
-    worker: new Worker("./workers/translation-worker.ts"),
-    chunk,
-    index,
-  }));
+  await project.processErrors(errorProcessor);
+  project.complete();
 
-  const promises = workers.map((worker) => {
-    return new Promise<string>((resolve, reject) => {
-      const workerData: WorkerData = {
-        rawSubtitles: worker.chunk,
-        tempFilePath: `${process.cwd()}/.tmp.subs/${outputPath.split("/").pop()}.tmp${worker.index}`,
-        index: worker.index,
-      };
-      worker.worker.postMessage(workerData);
-      worker.worker.on("message", (translation) => {
-        console.log("[main thread] subtitles received");
-        worker.worker.terminate();
-        resolve(translation);
-      });
-
-      worker.worker.on("error", reject);
-      worker.worker.on("exit", (code) => {
-        if (code != 0)
-          reject(new Error(`Worker stopped with exit code ${code}`));
-      });
-    });
-  });
-
-  Promise.all(promises)
-    .then((data) => {
-      writeFile(outputPath, data.join(""));
-      console.log("All workers finished their tasks", data);
-    })
-    .catch((err) => console.error("A worker encountered an error: ", err));
+  logger.debug("Translations generated successfully");
+  console.timeEnd("translation");
 }
 
 main();

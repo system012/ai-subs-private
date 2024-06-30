@@ -1,11 +1,17 @@
 import { LINE_DELIMITER, DEFAULT_MAX_CHUNK_SIZE } from "../utils/constants";
 import { isDialogueOver } from "../utils/subtitles";
+import type { SubtitleT } from "./subtitle";
 
 export class Chunk {
-  public data: string = "";
   private maxSize: number = DEFAULT_MAX_CHUNK_SIZE;
 
-  constructor() {}
+  private constructor(
+    public id: number = 0,
+    public data: string = "",
+  ) {
+    this.id = id;
+    this.data = data;
+  }
 
   get size() {
     return this.data.length;
@@ -15,6 +21,9 @@ export class Chunk {
     this.data += data + LINE_DELIMITER;
   }
 
+  toString() {
+    //
+  }
   isChunkFull() {
     return this.size > this.maxSize && isDialogueOver(this.data.trimEnd());
   }
@@ -23,109 +32,25 @@ export class Chunk {
     this.maxSize = size;
     return this;
   }
-}
 
-export class ArrayChunk {
-  public data: string[] = [];
-  private maxSize: number = DEFAULT_MAX_CHUNK_SIZE;
-
-  constructor() {}
-
-  get size() {
-    return this.data.length;
+  static fromString(id: number, data: string) {
+    return new Chunk(id, data);
   }
 
-  append(item: string) {
-    this.data.push(item);
+  /**
+   * This method exists to convert translated subtitles into a chunk.
+   * We can't use "createChunks" function because it might create multiple chunks since the translation can be longer than the original text.
+   **/
+  static fromSubtitles(id: number, subtitles: SubtitleT[]) {
+    const subToString = subtitles.reduce((acc, sub) => {
+      acc += sub.toString();
+      return acc;
+    }, "");
+
+    return new Chunk(id, subToString);
   }
 
-  isChunkFull() {
-    const lastElement = this.data.at(-1);
-    return this.size > this.maxSize && isDialogueOver(lastElement ?? "");
-  }
-
-  withMaxSize(size: number) {
-    this.maxSize = size;
-    return this;
+  static create(id: number = 0) {
+    return new Chunk(id);
   }
 }
-
-// export class Chunks {
-//     private chunks: Chunk[] = []
-//     private maxSize: number = DEFAULT_MAX_CHUNK_SIZE
-
-//     constructor(chunks: Chunk[] = []) {
-//         this.chunks = chunks
-//     }
-
-//     get size() {
-//         return this.chunks.reduce((acc, chunk) => acc + chunk.size, 0)
-//     }
-
-//     add(chunk: Chunk) {
-//         this.chunks.push(chunk)
-//     }
-
-//     withMaxSize(size: number = DEFAULT_MAX_CHUNK_SIZE) {
-//         this.maxSize = size
-//         return this
-//     }
-
-//     append(data: string) {
-//         const lastChunk = this.chunks.at(-1)
-//         if (!lastChunk || lastChunk?.isChunkFull()) {
-//             this.add(new Chunk(data).withMaxSize(this.maxSize))
-//             return
-//         }
-
-//         lastChunk?.append(data)
-//     }
-
-//     *[Symbol.iterator]() {
-//         for (const chunk of this.chunks) {
-//             yield chunk
-//         }
-//     }
-// }
-
-// export class ArrayChunks {
-//     public chunks: ArrayChunk[] = [];
-//     private maxSize: number = DEFAULT_MAX_CHUNK_SIZE;
-
-//     constructor(chunks: ArrayChunk[] = []) {
-//         this.chunks = chunks;
-//     }
-
-//     get size() {
-//         return this.chunks.reduce((acc, chunk) => acc + chunk.size, 0);
-//     }
-
-//     add(chunk: ArrayChunk) {
-//         this.chunks.push(chunk);
-//     }
-
-//     withMaxSize(size: number = DEFAULT_MAX_CHUNK_SIZE) {
-//         this.maxSize = size;
-//         return this;
-//     }
-
-//     append(data: string) {
-//         const lastChunk = this.chunks.at(-1);
-//         if (!lastChunk || lastChunk?.isChunkFull()) {
-//             this.add(new ArrayChunk(data).withMaxSize(this.maxSize));
-//             return;
-//         }
-
-//         lastChunk?.append(data);
-//     }
-
-//     map<T>(callback: (chunk: ArrayChunk, index: number) => T): T[] {
-//         return this.chunks.map(callback);
-//     }
-
-//     *[Symbol.iterator]() {
-//         for (const chunk of this.chunks) {
-//             yield chunk;
-//         }
-//     }
-// }

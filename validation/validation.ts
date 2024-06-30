@@ -2,7 +2,7 @@ import {
   type SubtitleCallbackArguments,
   iterateSubtitles,
   type SubtitleResult,
-} from "./subtitles";
+} from "../utils/subtitles";
 import { type SubtitleT } from "../entities/subtitle";
 
 type ValidationResult = {
@@ -83,6 +83,7 @@ export function validate(
 export function isLineNumberSequential({
   subtitle,
   prevSubtitle,
+  logger,
 }: ValidationFunctionParams): ValidationResult {
   const { lineNumber } = subtitle;
   const { lineNumber: prevLineNumber } = prevSubtitle;
@@ -91,7 +92,7 @@ export function isLineNumberSequential({
 
   const ok = lineNumber === prevLineNumber + 1;
   if (!ok) {
-    console.error("Line number is not sequential. Sequence is not valid.", {
+    logger?.error("Line number is not sequential. Sequence is not valid.", {
       currentNumber: lineNumber,
       prevNumber: prevLineNumber,
     });
@@ -112,6 +113,7 @@ export function isLineNumberSequential({
 export function isWithinLengthRange({
   subtitle,
   originalSub,
+  logger,
 }: ValidationFunctionParams): ValidationResult {
   const { text: currentText } = subtitle;
   const currentTextWordsArray =
@@ -134,14 +136,14 @@ export function isWithinLengthRange({
 
   const exceptions = ["♪"];
   if (exceptions.includes(originalTextString)) {
-    console.warn(
+    logger?.debug(
       "[WithinRange check] Skipping line with exception:",
       originalTextString,
     );
     return { type: "success", value: "" };
   }
   if (originalTextWordsLength < 4) {
-    console.warn(
+    logger?.debug(
       "[WithinRange check] Skipping line with less than 4 words:",
       originalTextString,
     );
@@ -154,7 +156,7 @@ export function isWithinLengthRange({
   const isWithinRange = !(isTooLong || isTooShort);
 
   if (!isWithinRange) {
-    console.error("Line length is not within range. Sequence is not valid.", {
+    logger?.error("Line length is not within range. Sequence is not valid.", {
       originalTextLength: originalTextWordsLength,
       textLength: currentTextWordsLength,
       originalSub: originalTextWordsArray,

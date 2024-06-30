@@ -1,5 +1,6 @@
 import { LINE_DELIMITER, LINE_REGEX } from "./constants";
 import { type SubtitleT, type Timecode, Subtitle } from "../entities/subtitle";
+import { createLogger } from "./logger";
 
 export type SubtitleCallbackArguments<T> = {
   subtitle: SubtitleT;
@@ -7,6 +8,7 @@ export type SubtitleCallbackArguments<T> = {
   prevSubtitle: SubtitleT;
   originalSub: SubtitleT;
   result?: SubtitleCallbackReturn<T>;
+  logger?: ReturnType<typeof createLogger>;
 };
 export type SubtitleCallbackReturn<T> = {
   type: "error" | "success";
@@ -62,6 +64,7 @@ export function iterateSubtitles<T>(
   subtitles: SubtitleT[],
   originalSubs: SubtitleT[],
   callbacks: SubtitleCallbackFunction<T>[],
+  logger: ReturnType<typeof createLogger> = createLogger(true),
 ): SubtitleCallbackReturn<T> {
   let prevSubtitle: SubtitleT = {
     lineNumber: 0,
@@ -70,13 +73,20 @@ export function iterateSubtitles<T>(
   };
   let result: SubtitleCallbackReturn<T> = {
     type: "success",
-    value: "" as T,
+    value: [] as T,
   };
 
   for (const [index, subtitle] of subtitles.entries()) {
     for (const callback of callbacks) {
       const originalSub = originalSubs[index];
-      result = callback({ subtitle, index, prevSubtitle, originalSub, result });
+      result = callback({
+        subtitle,
+        index,
+        prevSubtitle,
+        originalSub,
+        result,
+        logger,
+      });
       if (result.type === "error") return result;
     }
     prevSubtitle = subtitle;
