@@ -1,4 +1,3 @@
-import ollama from "ollama";
 import {
   createSubtitles,
   iterateSubtitles,
@@ -10,33 +9,65 @@ import { Subtitle, type SubtitleT } from "../entities/subtitle";
 import { Chunk } from "../entities/chunk";
 import { createLogger } from "../utils/logger";
 import { SUBTITLE_DELIMITER } from "../utils/constants";
+import { getConfig } from "../config/get-config";
+import { type LLMProvider } from "../providers/types";
+import { retry } from "../utils/retry";
 
 export async function translate({
   chunk,
   promptAddendum,
   logger,
+  provider
 }: {
   chunk: Chunk;
   promptAddendum?: string;
   logger: ReturnType<typeof createLogger>;
+  provider: LLMProvider;
 }): Promise<{
   translated: SubtitleT[];
   type: "error" | "success" | "error-queue";
   prompt: string;
 }> {
-  const translated = await generate(chunk.data, { logger, promptAddendum });
-  const translatedSubsResult = createSubtitles(translated);
+  const config = getConfig();
+  const generateResult = await retry(
+      () => provider.generate({
+        content: chunk.data,
+        logger,
+        promptAddendum,
+        model: config.model,
+      }),
+      {
+        maxAttempts: 5,
+        initialDelay: 3000
+      }
+  );
+  
+  if (generateResult.error) {
+    logger.error(
+      "LLM provider failed to generate translation:",
+      generateResult.message || "No value returned",
+    );
+
+    return {
+      translated: [],
+      type: "error",
+      prompt: ""
+    };
+  }
+
+  const translatedSubsResult = createSubtitles(generateResult.value);
   const originalSubResult = createSubtitles(chunk.data);
-  const { type, value: prompt } = validate(
+
+  const { type: validationType, value: validationPrompt } = validate(
     translatedSubsResult,
     originalSubResult,
   );
 
-  if (type === "error") {
+  if (validationType === "error") {
     return {
       translated: [],
       type: "error-queue",
-      prompt,
+      prompt: validationPrompt,
     };
   }
 
@@ -48,56 +79,6 @@ export async function translate({
   return { translated: processed.value, type: "success", prompt: "" };
 }
 
-export async function generate(
-  content: string,
-  {
-    logger,
-    promptAddendum = "",
-    temperature = 0.7,
-  }: {
-    logger: ReturnType<typeof createLogger>;
-    promptAddendum?: string;
-    temperature?: number;
-  },
-) {
-  try {
-    const system = `You are a professional translator from english to Italian.
-            You're going to receive english subtitles in SRT format.
-            Read the text carefully.
-            Your job is to ONLY translate the text from english to italian.
-            Translate it as accurately as possible, like a native speaker.
-            The translated text should sound natural and fluent in Italian.
-            Leave everything else as is.
-            DO NOT change the timecode.
-            DO NOT change the line number.
-            DO NOT change the structure of the text.
-            DO NOT say anything else.
-            ${promptAddendum}`;
-
-    logger.debug("Input sent", {
-      length: content.length,
-      ...(promptAddendum !== ""
-        ? {
-            promptAddendum,
-          }
-        : {}),
-    });
-    const response = await ollama.generate({
-      model: "mixtral:8x7b-instruct-v0.1-q3_K_M",
-      // model: 'llava-llama3:latest',
-      system,
-      prompt: content,
-      options: {
-        temperature,
-      },
-    });
-    return response.response;
-  } catch (error) {
-    console.error("Error generating response:", error);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    return generate(content, { logger, promptAddendum, temperature });
-  }
-}
 
 function processResponse(
   currentSub: SubtitleResult,
@@ -109,7 +90,7 @@ function processResponse(
       currentSub.message,
     );
     return {
-      type: "error",
+      type: "error" as const,
       value: [],
     };
   }
@@ -119,7 +100,7 @@ function processResponse(
       originalChunk.message,
     );
     return {
-      type: "error",
+      type: "error" as const,
       value: [],
     };
   }
@@ -161,13 +142,13 @@ function processResponse(
     );
     return {
       value: [],
-      type: "error",
+      type: "error" as const,
     };
   }
 
   return {
     value: result.value,
-    type: "success",
+    type: "success" as const,
   };
 }
 

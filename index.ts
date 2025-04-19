@@ -1,4 +1,4 @@
-import { translate } from "./translation/translation";
+import { translate } from "./translation";
 import { Chunk } from "./entities/chunk";
 import { createLogger } from "./utils/logger";
 import { Project } from "./entities/project";
@@ -6,12 +6,16 @@ import { normalizeSubs } from "./utils/normalize";
 import { StateItem } from "./entities/state-item";
 import { errorProcessor } from "./utils/error-processor";
 import { getConfig } from "./config/get-config";
+import * as dotenv from "dotenv";
+import { createLLMProvider } from "./providers/factory";
+
+dotenv.config();
 
 async function main() {
-  // get argument from command line
   const config = getConfig();
   const logger = createLogger(config.debug);
   const project = new Project(config.input, config.output);
+  const provider = createLLMProvider()
 
   project.addPreprocessors([normalizeSubs]);
   await project.init();
@@ -21,7 +25,10 @@ async function main() {
     logger.log(
       `Translating chunk ${index + 1} out of ${project.chunks.length}. Chunk ID: ${chunk.id}`,
     );
-    const { translated, type, prompt } = await translate({ chunk, logger });
+    console.time(`chunk ${index + 1} translation`);
+    const { translated, type, prompt } = await translate({ chunk, logger, provider });
+    console.timeEnd(`chunk ${index + 1} translation`);
+
     if (type === "error-queue") {
       project.save(new StateItem(chunk, "error", prompt));
       continue;
@@ -37,7 +44,7 @@ async function main() {
     );
   }
 
-  await project.processErrors(errorProcessor);
+  await project.processErrors(errorProcessor, provider);
   project.complete();
 
   logger.debug("Translations generated successfully");

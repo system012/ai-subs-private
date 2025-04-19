@@ -1,5 +1,5 @@
 // unused
-import { translate } from "../translation/translation";
+import { translate } from "../translation";
 import { Chunk } from "../entities/chunk";
 import { type QueueItemT, QueueItem } from "./queue-item";
 import type { SubtitleT } from "../entities/subtitle";

@@ -1,8 +1,9 @@
-import { translate } from "../translation/translation";
+import { translate } from "../translation";
 import { Chunk } from "../entities/chunk";
 import { StateItem } from "../entities/state-item";
 import type { SubtitleT } from "../entities/subtitle";
 import { createLogger } from "./logger";
+import type { LLMProvider } from "../providers/types";
 
 type ErrorProcessorOptionsT = {
   attempts?: number;
@@ -12,6 +13,7 @@ type ErrorProcessorOptionsT = {
 
 export const errorProcessor = async (
   item: StateItem<Chunk>,
+  provider: LLMProvider,
   {
     attempts = 1,
     maxAttempts = 50,
@@ -33,6 +35,7 @@ export const errorProcessor = async (
     chunk: item.value,
     promptAddendum: item.prompt,
     logger,
+    provider,
   });
 
   if (type === "success") return { value, type };
@@ -44,7 +47,7 @@ export const errorProcessor = async (
   });
 
   return attempts < maxAttempts
-    ? errorProcessor(new StateItem(item.value, "error", prompt), {
+    ? errorProcessor(new StateItem(item.value, "error", prompt), provider, {
         attempts: attempts + 1,
         logger,
       })

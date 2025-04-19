@@ -7,6 +7,7 @@ import { State } from "./state";
 import { StateItem } from "./state-item";
 import type { errorProcessor } from "../utils/error-processor";
 import { createLogger } from "../utils/logger";
+import type { LLMProvider } from "../providers/types";
 
 export type Preprocessor = (subs: string) => string;
 
@@ -51,7 +52,7 @@ export class Project {
     return this;
   }
 
-  async processErrors(processor: typeof errorProcessor) {
+  async processErrors(processor: typeof errorProcessor, provider: LLMProvider) {
     this.logger?.log("Processing errors...");
 
     const errorItems = this.state.errors;
@@ -60,7 +61,7 @@ export class Project {
       this.logger?.log(
         `Processing error ${index + 1} out of ${errorItems.length}`,
       );
-      const { value, type } = await processor(item);
+      const { value, type } = await processor(item, provider);
       if (type !== "success") {
         throw new Error(
           "[Project] [processErrors()] Error processing error chunk.",
