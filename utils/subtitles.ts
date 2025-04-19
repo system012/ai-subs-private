@@ -95,9 +95,10 @@ export function iterateSubtitles<T>(
   return result;
 }
 export function createSubtitle(
-  line: string,
+  block: string,
 ): { value: SubtitleT; type: "success" } | SubtitleError {
-  const [lineNumber, timecode, ...text] = line.split(LINE_DELIMITER);
+  const trimmedBlock = block.trim();
+  const [lineNumber, timecode, ...text] = trimmedBlock.split(LINE_DELIMITER);
   const lineToNumber = parseInt(lineNumber);
   if (isNaN(lineToNumber)) {
     return {
@@ -120,15 +121,12 @@ export function createSubtitle(
       message: new Error("[createSubtitle] Text is missing."),
     };
 
-  const textWithoutEmptyElements =
-    text?.at(-1) === "" ? text.slice(0, -1) : text;
-
   return {
     type: "success",
     value: new Subtitle(
       lineToNumber,
       timecode as Timecode,
-      textWithoutEmptyElements,
+      text.filter((line) => line.trim() !== ""),
     ),
   };
 }
