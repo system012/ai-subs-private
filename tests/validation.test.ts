@@ -4,8 +4,9 @@ import {
   isLineNumberSequential,
   isWithinLengthRange,
 } from "../validation/validation";
-import { type SubtitleT, Subtitle } from "../entities/subtitle";
+import { type SubtitleT } from "../entities/subtitle";
 import { type SubtitleResult } from "../utils/subtitles";
+import { createMockSubtitle } from "./common/helpers";
 
 // Mock logger
 const mockLogger = {
@@ -14,13 +15,6 @@ const mockLogger = {
     warn: mocker.fn(),
     error: mocker.fn(),
 }
-
-// Helper to create mock subtitles
-const createMockSubtitle = (
-  lineNumber: number,
-  text: string[],
-  timecode = "00:00:01,000 --> 00:00:02,000",
-): SubtitleT => new Subtitle(lineNumber, timecode as any, text);
 
 // Helper to create SubtitleResult
 const createSuccessResult = (subs: SubtitleT[]): SubtitleResult => ({

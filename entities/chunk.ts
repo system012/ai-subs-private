@@ -3,7 +3,7 @@ import { isDialogueOver } from "../utils/subtitles";
 import type { SubtitleT } from "./subtitle";
 
 export class Chunk {
-  private maxSize: number = DEFAULT_MAX_CHUNK_SIZE;
+  private _maxSize: number = DEFAULT_MAX_CHUNK_SIZE;
 
   private constructor(
     public id: number = 0,
@@ -17,6 +17,10 @@ export class Chunk {
     return this.data.length;
   }
 
+  get maxSize() {
+    return this._maxSize;
+  }
+
   append(data: string) {
     this.data += data + LINE_DELIMITER;
   }
@@ -25,11 +29,11 @@ export class Chunk {
     //
   }
   isChunkFull() {
-    return this.size > this.maxSize && isDialogueOver(this.data.trimEnd());
+    return this.size >= this._maxSize && isDialogueOver(this.data.trimEnd());
   }
 
   withMaxSize(size: number) {
-    this.maxSize = size;
+    this._maxSize = size;
     return this;
   }
 
