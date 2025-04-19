@@ -19,6 +19,7 @@ type ValidationFunctionParams = SubtitleCallbackArguments<string> & {
 export function validate(
   translatedSubs: SubtitleResult,
   originalSubs: SubtitleResult,
+  logger?: ReturnType<typeof import("../utils/logger").createLogger>,
 ): ValidationResult {
   if (translatedSubs.type === "error") {
     console.error(
@@ -74,10 +75,15 @@ export function validate(
     };
   }
 
-  return iterateSubtitles(subtitles, originalSubtitles, [
-    isLineNumberSequential,
-    isWithinLengthRange,
-  ]);
+  return iterateSubtitles(
+    subtitles,
+    originalSubtitles,
+    [
+      isLineNumberSequential,
+      isWithinLengthRange,
+    ],
+    logger
+);
 }
 
 export function isLineNumberSequential({
