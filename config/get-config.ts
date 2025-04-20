@@ -1,4 +1,5 @@
 import { program } from "commander";
+import { DEFAULT_MAX_PROJECT_FOLDERS } from "../utils/constants";
 
 type Config = {
   input: string;
@@ -6,6 +7,7 @@ type Config = {
   debug: boolean;
   model: string;
   provider: "openai" | "ollama";
+  maxProjectFolders: number;
 };
 
 let config: Config;
@@ -21,7 +23,14 @@ export const getConfig = () => {
     .option(
       "-p, --provider <provider>",
       "LLM provider to use (openai or ollama)",
+      (value) => value.toLowerCase(),
       "openai",
+    )
+    .option(
+      "--max-project-folders <number>",
+      "Maximum number of project state folders to keep",
+      (value) => parseInt(value, 10),
+      DEFAULT_MAX_PROJECT_FOLDERS,
     )
     .parse(process.argv)
     .opts();

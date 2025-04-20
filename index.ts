@@ -14,7 +14,7 @@ dotenv.config();
 async function main() {
   const config = getConfig();
   const logger = createLogger(config.debug);
-  const project = new Project(config.input, config.output);
+  const project = new Project(config.input, config.output, config.maxProjectFolders);
   const provider = createLLMProvider()
 
   project.addPreprocessors([normalizeSubs]);

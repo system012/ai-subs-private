@@ -1,4 +1,4 @@
-import { fileExists, writeFile, readFile } from "../utils/io";
+import { fileExists, writeFile, readFile, getDirectories, deleteDir } from "../utils/io";
 import { createSubtitles } from "../utils/subtitles";
 import { createChunks } from "../utils/chunks";
 import { DEFAULT_MAX_CHUNK_SIZE } from "../utils/constants";
@@ -8,6 +8,7 @@ import { StateItem } from "./state-item";
 import type { errorProcessor } from "../utils/error-processor";
 import { createLogger } from "../utils/logger";
 import type { LLMProvider } from "../providers/types";
+import path from "path";
 
 export type Preprocessor = (subs: string) => string;
 
@@ -21,15 +22,23 @@ export class Project {
   private logger: ReturnType<typeof createLogger> | undefined = undefined;
   public projectDir: string;
   public chunks: Chunk[] = [];
+  private maxProjectFolders: number;
+  private baseProjectsDir: string;
 
-  constructor(inputFile: string, outputFile: string) {
+  constructor(
+    inputFile: string,
+    outputFile: string,
+    maxProjectFolders: number,
+  ) {
     this.inputFile = inputFile;
     this.outputFile = outputFile;
-    this.projectDir = `${process.cwd()}/.projects/project_${outputFile
-      .split("/")
-      .at(-1)
-      ?.replace(/[^a-z0-9]/gi, "_")}`;
-    this.stateFile = `${this.projectDir}/.state.json`;
+    this.maxProjectFolders = maxProjectFolders;
+    this.baseProjectsDir = path.join(process.cwd(), ".projects");
+    this.projectDir = path.join(
+      this.baseProjectsDir,
+      `project_${path.basename(outputFile).replace(/[^a-z0-9]/gi, "_")}`,
+    );
+    this.stateFile = path.join(this.projectDir, ".state.json");
     this.logger = createLogger(true);
   }
 
@@ -79,12 +88,45 @@ export class Project {
 
     if (!projectExists) {
       await this.create();
+      await this.cleanup();
       this.logger?.log("Project created.");
       return;
     }
 
     await this.resume();
-    this.logger?.log("Projected resumed.");
+    this.logger?.log("Project resumed.");
+  }
+
+  private async cleanup() {
+    this.logger?.log("Checking project folder limits...");
+    try {
+      const dirs = await getDirectories(this.baseProjectsDir);
+      if (dirs.length <= this.maxProjectFolders) return
+
+      this.logger?.log(
+        `Found ${dirs.length} project folders (limit: ${this.maxProjectFolders}). Cleaning up...`,
+      );
+      // Sort by modification time (oldest first)
+      const projectDirs = dirs
+      .toSorted((a, b) => a.mtimeMs - b.mtimeMs)
+      .filter(
+        // Exclude the current project directory
+        (dir) => dir.path !== this.projectDir,
+      );
+
+      const foldersToDelete = dirs.length - this.maxProjectFolders
+      this.logger?.log(`Need to delete ${foldersToDelete} oldest folder(s).`);
+
+      for (let i = 0; i < foldersToDelete; i++) {
+        const dirToDelete = projectDirs[i].path;
+        this.logger?.log(`Deleting old project folder: ${dirToDelete}`);
+        await deleteDir(dirToDelete);
+      }
+    } catch (error) {
+      this.logger?.error("Error during project folder cleanup:", error);
+    }
+
+    this.logger?.log("Projects folder cleanup complete.");
   }
 
   private async create() {
@@ -102,7 +144,7 @@ export class Project {
     this.state.value = chunks.map((chunk) => new StateItem(chunk));
     this.chunks = chunks;
 
-    writeFile(this.stateFile, JSON.stringify(this.state, null, 2));
+    await writeFile(this.stateFile, JSON.stringify(this.state, null, 2));
   }
 
   private async resume() {
