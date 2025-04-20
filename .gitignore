@@ -177,8 +177,10 @@ dist
 # output translation files
 
 *.srt
-/.tmp.subs
-/.projects/
+.tmp.subs
+.projects/
+subs
+output
 
 # Environment variables
 .env

@@ -3,7 +3,8 @@
   "module": "index.ts",
   "scripts": {
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "translate": "bash scripts/run.sh"
   },
   "devDependencies": {
     "@types/bun": "latest",
