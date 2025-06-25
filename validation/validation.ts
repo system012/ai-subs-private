@@ -78,12 +78,9 @@ export function validate(
   return iterateSubtitles(
     subtitles,
     originalSubtitles,
-    [
-      isLineNumberSequential,
-      isWithinLengthRange,
-    ],
-    logger
-);
+    [isLineNumberSequential, isWithinLengthRange],
+    logger,
+  );
 }
 
 export function isLineNumberSequential({
@@ -156,8 +153,8 @@ export function isWithinLengthRange({
     return { type: "success", value: "" };
   }
 
-  const isTooLong = currentTextWordsLength > originalTextWordsLength * 2.5;
-  const isTooShort = currentTextWordsLength < originalTextWordsLength * 0.3;
+  const isTooLong = currentTextWordsLength > originalTextWordsLength * 3.0;
+  const isTooShort = currentTextWordsLength < originalTextWordsLength * 0.2;
 
   const isWithinRange = !(isTooLong || isTooShort);
 
