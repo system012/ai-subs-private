@@ -184,3 +184,7 @@ output
 
 # Environment variables
 .env
+
+# LLM
+
+.gemini

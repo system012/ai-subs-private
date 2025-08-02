@@ -17,7 +17,7 @@ export async function translate({
   chunk,
   promptAddendum,
   logger,
-  provider
+  provider,
 }: {
   chunk: Chunk;
   promptAddendum?: string;
@@ -29,29 +29,41 @@ export async function translate({
   prompt: string;
 }> {
   const config = getConfig();
-  const generateResult = await retry(
-      () => provider.generate({
-        content: chunk.data,
-        logger,
-        promptAddendum,
-        model: config.model,
-      }),
+  let generateResult;
+  for (const model of [config.model, ...config.fallbackModels]) {
+    generateResult = await retry(
+      () =>
+        provider.generate({
+          content: chunk.data,
+          logger,
+          promptAddendum,
+          model: model,
+        }),
       {
         maxAttempts: 5,
-        initialDelay: 3000
-      }
-  );
-  
-  if (generateResult.error) {
+        initialDelay: 3000,
+      },
+    );
+
+    if (
+      !generateResult.error ||
+      (generateResult.error && generateResult.status === 429)
+    ) {
+      break;
+    }
+    logger.warn(`429 error encountered, switching to next model: ${model}`);
+  }
+
+  if (!generateResult || generateResult?.error) {
     logger.error(
       "LLM provider failed to generate translation:",
-      generateResult.message || "No value returned",
+      generateResult?.message || "No value returned",
     );
 
     return {
       translated: [],
       type: "error",
-      prompt: ""
+      prompt: "",
     };
   }
 
@@ -78,7 +90,6 @@ export async function translate({
 
   return { translated: processed.value, type: "success", prompt: "" };
 }
-
 
 function processResponse(
   currentSub: SubtitleResult,

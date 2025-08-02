@@ -16,11 +16,11 @@ export const errorProcessor = async (
   provider: LLMProvider,
   {
     attempts = 1,
-    maxAttempts = 50,
+    maxAttempts = 5,
     logger = createLogger(true),
   }: ErrorProcessorOptionsT = {
     attempts: 1,
-    maxAttempts: 50,
+    maxAttempts: 5,
     logger: createLogger(true),
   },
 ): Promise<{

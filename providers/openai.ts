@@ -52,6 +52,7 @@ export class OpenAIProvider implements LLMProvider {
         return {
           error: true,
           message: "No content received from OpenAI API.",
+          status: 0,
         };
       }
 
@@ -64,6 +65,7 @@ export class OpenAIProvider implements LLMProvider {
       return {
         error: true,
         message: error.message || "Unknown OpenAI API error",
+        status: error.status,
       };
     }
   }

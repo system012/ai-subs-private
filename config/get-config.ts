@@ -6,6 +6,7 @@ type Config = {
   output: string;
   debug: boolean;
   model: string;
+  fallbackModels: string[];
   provider: "openai" | "ollama";
   maxProjectFolders: number;
 };
@@ -20,6 +21,17 @@ export const getConfig = () => {
     .requiredOption("-o, --output <path>", "Output file path")
     .option("-d, --debug", "Enable debugging", false)
     .option("-m, --model <model>", "Model to use", "gemini-2.0-flash")
+    .option(
+      "--fallback-models <models>",
+      "Comma-separated list of fallback models",
+      (value) => value.split(","),
+      [
+        "gemini-2.5-flash",
+        "gemini-2.0-flash-preview-image-generation",
+        "gemini-1.5-flash",
+        "gemini-2.5-flash-lite-preview-06-17",
+      ],
+    )
     .option(
       "-p, --provider <provider>",
       "LLM provider to use (openai or ollama)",
