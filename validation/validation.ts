@@ -16,6 +16,11 @@ type ValidationFunctionParams = SubtitleCallbackArguments<string> & {
   originalSub?: SubtitleT;
 };
 
+type LengthRangeParams = ValidationFunctionParams & {
+  tooLongMultiplier?: number;
+  tooShortMultiplier?: number;
+};
+
 export function validate(
   translatedSubs: SubtitleResult,
   originalSubs: SubtitleResult,
@@ -117,7 +122,9 @@ export function isWithinLengthRange({
   subtitle,
   originalSub,
   logger,
-}: ValidationFunctionParams): ValidationResult {
+  tooLongMultiplier = 3.0,
+  tooShortMultiplier = 0.2,
+}: LengthRangeParams): ValidationResult {
   const { text: currentText } = subtitle;
   const currentTextWordsArray =
     currentText
@@ -153,8 +160,8 @@ export function isWithinLengthRange({
     return { type: "success", value: "" };
   }
 
-  const isTooLong = currentTextWordsLength > originalTextWordsLength * 3.0;
-  const isTooShort = currentTextWordsLength < originalTextWordsLength * 0.2;
+  const isTooLong = currentTextWordsLength > originalTextWordsLength * tooLongMultiplier;
+  const isTooShort = currentTextWordsLength < originalTextWordsLength * tooShortMultiplier;
 
   const isWithinRange = !(isTooLong || isTooShort);
 

@@ -108,4 +108,31 @@ describe("createSubtitles Function", () => {
         );
     });
 
+  it("should trim leading spaces from subtitle text lines", () => {
+    const subtitleText = `1
+00:00:01,000 --> 00:00:02,000
+      (crickets chirping)
+
+2
+00:00:08,440 --> 00:00:11,441
+   (people shouting over tv)
+
+3
+00:00:13,000 --> 00:00:19,074
+                 Multiple lines with
+                    leading spaces`;
+
+    const result = createSubtitles(subtitleText);
+    expect(result.type).toBe("success");
+    
+    if (result.type === "success") {
+      const subtitles = result.value;
+      
+      expect(subtitles[0].text).toEqual(["(crickets chirping)"]);
+      expect(subtitles[1].text).toEqual(["(people shouting over tv)"]);
+      // check third subtitle with multiple lines
+      expect(subtitles[2].text).toEqual(["Multiple lines with", "leading spaces"]);
+    }
+  });
+
 });

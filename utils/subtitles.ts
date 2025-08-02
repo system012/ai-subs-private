@@ -126,7 +126,7 @@ export function createSubtitle(
     value: new Subtitle(
       lineToNumber,
       timecode as Timecode,
-      text.filter((line) => line.trim() !== ""),
+      text.filter((line) => line.trim() !== "").map((line) => line.trim()),
     ),
   };
 }

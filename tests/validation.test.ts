@@ -76,26 +76,33 @@ describe("validation", () => {
     });
 
     it("should return error if text length is too long", () => {
-      const subtitle = createMockSubtitle(1, [
-        "This translated text is significantly much much longer than the original source text provided, exceeding the allowed multiplication factor by a large margin.",
-      ]);
+      const originalWords = originalSub.text[0].split(" ").filter(word => word !== "");
+      const tooLongText = Array(originalWords.length * 4).fill("word").join(" ");
+      const subtitle = createMockSubtitle(1, [tooLongText]);
       const result = isWithinLengthRange({
         subtitle,
         originalSub,
         logger: mockLogger,
         index: 0,
         prevSubtitle: createMockSubtitle(0, []),
+        tooLongMultiplier: 3.0,
+        tooShortMultiplier: 0.2,
       });
       expect(result.type).toBe("error");
     });
 
     it("should return error if text length is too short", () => {
-      const subtitle = createMockSubtitle(1, ["Too short."]);
+      const originalWords = originalSub.text[0].split(" ").filter(word => word !== "");
+      const tooShortWordCount = Math.floor(originalWords.length * 0.15);
+      const tooShortText = Array(Math.max(1, tooShortWordCount)).fill("word").join(" ");
+      const subtitle = createMockSubtitle(1, [tooShortText]);
       const result = isWithinLengthRange({
         subtitle,
         originalSub,
         index: 0,
         prevSubtitle: createMockSubtitle(0, []),
+        tooLongMultiplier: 3.0,
+        tooShortMultiplier: 0.2,
       });
       expect(result.type).toBe("error");
     });
