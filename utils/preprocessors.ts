@@ -1,19 +1,40 @@
+import { type SubtitleT } from "../entities/subtitle";
+import { createLogger } from "./logger";
 
-import { Subtitle } from "../entities/subtitle";
-import { LINE_DELIMITER } from "./constants";
+type Logger = ReturnType<typeof createLogger>;
 
-export function removeDuplicateLineNumbers(subtitles: Subtitle[]): Subtitle[] {
-  const seen = new Set<number>();
-  const toRemove = new Set<number>();
+interface RemoveDuplicateLineNumbersParams<T extends SubtitleT> {
+  subtitles: T[];
+  logger: Logger;
+}
 
-  for (let i = 0; i < subtitles.length; i++) {
-    const { lineNumber } = subtitles[i];
-    if (seen.has(lineNumber)) {
-      toRemove.add(i);
-    } else {
-      seen.add(lineNumber);
-    }
+/**
+ * Removes duplicate line numbers from subtitles array.
+ * When duplicates are found, keeps the first occurrence and removes subsequent ones.
+ * 
+ * @param params Object containing subtitles array and logger instance
+ * @returns Array with duplicate line numbers removed
+ */
+export function removeDuplicateLineNumbers<T extends SubtitleT>(params: RemoveDuplicateLineNumbersParams<T>): T[] {
+  const { subtitles, logger } = params;
+  if (!Array.isArray(subtitles) || subtitles.length === 0) {
+    return subtitles;
   }
 
-  return subtitles.filter((_, i) => !toRemove.has(i));
+  const seenLineNumbers = new Set<number>();
+  const validSubtitles: T[] = [];
+
+  for (const subtitle of subtitles) {
+    const { lineNumber } = subtitle;
+
+    if (seenLineNumbers.has(lineNumber)) {
+      logger.warn(`Removing duplicate line number: ${lineNumber}`);
+      continue;
+    }
+
+    seenLineNumbers.add(lineNumber);
+    validSubtitles.push(subtitle);
+  }
+
+  return validSubtitles;
 }

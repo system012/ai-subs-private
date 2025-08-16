@@ -3,6 +3,7 @@ import { Chunk } from "./entities/chunk";
 import { createLogger } from "./utils/logger";
 import { Project } from "./entities/project";
 import { normalizeSubs } from "./utils/normalize";
+import { removeDuplicateLineNumbers } from "./utils/preprocessors";
 import { StateItem } from "./entities/state-item";
 import { errorProcessor } from "./utils/error-processor";
 import { getConfig } from "./config/get-config";
@@ -17,7 +18,9 @@ async function main() {
   const project = new Project(config.input, config.output, config.maxProjectFolders);
   const provider = createLLMProvider()
 
-  project.addPreprocessors([normalizeSubs]);
+  project
+    .addStringPreprocessors([normalizeSubs])
+    .addSubtitlePreprocessors([removeDuplicateLineNumbers]);
   await project.init();
   console.time("translation");
 

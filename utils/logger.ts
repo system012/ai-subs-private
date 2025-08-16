@@ -1,4 +1,4 @@
-export function createLogger(debug: boolean) {
+export function createLogger(debug?: boolean) {
   return {
     log: (...msg: unknown[]) => console.log(`[Logger] [Log]`, ...msg),
     warn: (...msg: unknown[]) => console.warn(`[Logger] [Warn]`, ...msg),

@@ -1,4 +1,10 @@
-import { fileExists, writeFile, readFile, getDirectories, deleteDir } from "../utils/io";
+import {
+  fileExists,
+  writeFile,
+  readFile,
+  getDirectories,
+  deleteDir,
+} from "../utils/io";
 import { createSubtitles } from "../utils/subtitles";
 import { createChunks } from "../utils/chunks";
 import { DEFAULT_MAX_CHUNK_SIZE } from "../utils/constants";
@@ -8,16 +14,22 @@ import { StateItem } from "./state-item";
 import type { errorProcessor } from "../utils/error-processor";
 import { createLogger } from "../utils/logger";
 import type { LLMProvider } from "../providers/types";
+import type { SubtitleT } from "./subtitle";
 import path from "path";
 
-export type Preprocessor = (subs: string) => string;
+export type StringPreprocessor = (subs: string) => string;
+export type SubtitlePreprocessor<T extends SubtitleT> = (params: {
+  subtitles: T[];
+  logger: ReturnType<typeof createLogger>;
+}) => T[];
 
 export class Project {
   private inputFile: string;
   private state: State<Chunk> = new State([]);
   private outputFile: string;
   private stateFile: string;
-  private preprocessors: Preprocessor[] = [];
+  private stringPreprocessors: StringPreprocessor[] = [];
+  private subtitlePreprocessors: SubtitlePreprocessor<SubtitleT>[] = [];
   // private queueClient: Queue<T> | undefined = undefined;
   private logger: ReturnType<typeof createLogger> | undefined = undefined;
   public projectDir: string;
@@ -56,8 +68,19 @@ export class Project {
     writeFile(this.outputFile, subtitles);
   }
 
-  addPreprocessors(preprocessors: Preprocessor[]) {
-    this.preprocessors.push(...preprocessors);
+  /**
+   * Add string-based preprocessors that work on raw subtitle text
+   */
+  addStringPreprocessors(preprocessors: StringPreprocessor[]) {
+    this.stringPreprocessors.push(...preprocessors);
+    return this;
+  }
+
+  /**
+   * Add subtitle-based preprocessors that work on parsed subtitle objects
+   */
+  addSubtitlePreprocessors(preprocessors: SubtitlePreprocessor<SubtitleT>[]) {
+    this.subtitlePreprocessors.push(...preprocessors);
     return this;
   }
 
@@ -101,20 +124,20 @@ export class Project {
     this.logger?.log("Checking project folder limits...");
     try {
       const dirs = await getDirectories(this.baseProjectsDir);
-      if (dirs.length <= this.maxProjectFolders) return
+      if (dirs.length <= this.maxProjectFolders) return;
 
       this.logger?.log(
         `Found ${dirs.length} project folders (limit: ${this.maxProjectFolders}). Cleaning up...`,
       );
       // Sort by modification time (oldest first)
       const projectDirs = dirs
-      .toSorted((a, b) => a.mtimeMs - b.mtimeMs)
-      .filter(
-        // Exclude the current project directory
-        (dir) => dir.path !== this.projectDir,
-      );
+        .toSorted((a, b) => a.mtimeMs - b.mtimeMs)
+        .filter(
+          // Exclude the current project directory
+          (dir) => dir.path !== this.projectDir,
+        );
 
-      const foldersToDelete = dirs.length - this.maxProjectFolders
+      const foldersToDelete = dirs.length - this.maxProjectFolders;
       this.logger?.log(`Need to delete ${foldersToDelete} oldest folder(s).`);
 
       for (let i = 0; i < foldersToDelete; i++) {
@@ -130,21 +153,61 @@ export class Project {
   }
 
   private async create() {
-    const preprocessed = this.preprocessors.reduce(
-      (subs, preprocessor) => preprocessor(subs),
-      await readFile(this.inputFile),
-    );
-    const result = createSubtitles(preprocessed);
-    if (result.type === "error") {
-      throw result.message;
-    }
-    const chunks = createChunks(result.value, {
-      maxSize: DEFAULT_MAX_CHUNK_SIZE,
-    });
-    this.state.value = chunks.map((chunk) => new StateItem(chunk));
-    this.chunks = chunks;
+    try {
+      const rawSubtitleText = await readFile(this.inputFile);
+      const preprocessedText = this.applyStringPreprocessors(rawSubtitleText);
+      const parseResult = createSubtitles(preprocessedText);
 
-    await writeFile(this.stateFile, JSON.stringify(this.state, null, 2));
+      if (parseResult.type === "error") {
+        throw new Error(
+          `Failed to parse subtitles: ${parseResult.message.message}`,
+        );
+      }
+
+      const processedSubtitles = this.applySubtitlePreprocessors(
+        parseResult.value,
+      );
+
+      const chunks = createChunks(processedSubtitles, {
+        maxSize: DEFAULT_MAX_CHUNK_SIZE,
+      });
+
+      this.state.value = chunks.map((chunk) => new StateItem(chunk));
+      this.chunks = chunks;
+
+      await writeFile(this.stateFile, JSON.stringify(this.state, null, 2));
+
+      this.logger?.log(`Project created with ${chunks.length} chunks`);
+    } catch (error) {
+      this.logger?.error("Failed to create project:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Apply all registered string preprocessors to the raw subtitle text
+   */
+  private applyStringPreprocessors(text: string): string {
+    return this.stringPreprocessors.reduce(
+      (processedText, preprocessor) => preprocessor(processedText),
+      text,
+    );
+  }
+
+  /**
+   * Apply all registered subtitle preprocessors
+   */
+  private applySubtitlePreprocessors(subtitles: SubtitleT[]): SubtitleT[] {
+    let processedSubtitles = subtitles;
+
+    for (const preprocessor of this.subtitlePreprocessors) {
+      processedSubtitles = preprocessor({
+        subtitles: processedSubtitles,
+        logger: this.logger!,
+      });
+    }
+
+    return processedSubtitles;
   }
 
   private async resume() {
