@@ -100,7 +100,7 @@ bun run index.ts -i "$selected_file" -o "$output_file"
 exit_code=$?
 
 if [ $exit_code -eq 0 ]; then
-  gum style --foreground 70 "Translation process completed successfully."
+  gum style --foreground 70 "Translation process completed successfully for: $filename"
 else
   gum style --foreground 197 "Translation process failed with exit code $exit_code."
 fi

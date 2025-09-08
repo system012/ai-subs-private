@@ -40,18 +40,16 @@ export async function translate({
           model: model,
         }),
       {
-        maxAttempts: 5,
+        maxAttempts: 10,
         initialDelay: 3000,
       },
     );
 
-    if (
-      !generateResult.error ||
-      (generateResult.error && generateResult.status === 429)
-    ) {
-      break;
-    }
-    logger.warn(`429 error encountered, switching to next model: ${model}`);
+    if (!generateResult.error) break;
+
+    logger.warn(
+      `error persisting after retrying, switching to next model: ${model}`,
+    );
   }
 
   if (!generateResult || generateResult?.error) {

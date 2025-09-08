@@ -15,8 +15,12 @@ dotenv.config();
 async function main() {
   const config = getConfig();
   const logger = createLogger(config.debug);
-  const project = new Project(config.input, config.output, config.maxProjectFolders);
-  const provider = createLLMProvider()
+  const project = new Project(
+    config.input,
+    config.output,
+    config.maxProjectFolders,
+  );
+  const provider = createLLMProvider();
 
   project
     .addStringPreprocessors([normalizeSubs])
@@ -29,7 +33,11 @@ async function main() {
       `Translating chunk ${index + 1} out of ${project.chunks.length}. Chunk ID: ${chunk.id}`,
     );
     console.time(`chunk ${index + 1} translation`);
-    const { translated, type, prompt } = await translate({ chunk, logger, provider });
+    const { translated, type, prompt } = await translate({
+      chunk,
+      logger,
+      provider,
+    });
     console.timeEnd(`chunk ${index + 1} translation`);
 
     if (type === "error-queue") {
@@ -50,7 +58,7 @@ async function main() {
   await project.processErrors(errorProcessor, provider);
   project.complete();
 
-  logger.debug("Translations generated successfully");
+  logger.debug(`Translation generated successfully for file: ${config.input}`);
   console.timeEnd("translation");
 }
 

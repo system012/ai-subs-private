@@ -21,6 +21,7 @@ export const getConfig = () => {
     .requiredOption("-o, --output <path>", "Output file path")
     .option("-d, --debug", "Enable debugging", false)
     .option("-m, --model <model>", "Model to use", "gemini-2.0-flash")
+    // .option("-m, --model <model>", "Model to use", "gemini-2.5-flash")
     .option(
       "--fallback-models <models>",
       "Comma-separated list of fallback models",
