@@ -15,9 +15,13 @@ export class OpenAIProvider implements LLMProvider {
         "LLM_API_KEY environment variable is not set for OpenAI provider.",
       );
     }
+
+    const baseURL = process.env.LLM_API_URL;
+    if (!baseURL) throw new Error("LLM_API_URL is required");
+
     this.llm = new OpenAI({
-      baseURL: "https://generativelanguage.googleapis.com/v1beta",
-      apiKey: apiKey,
+      baseURL,
+      apiKey,
     });
   }
 
@@ -61,7 +65,7 @@ export class OpenAIProvider implements LLMProvider {
       });
       return { value: messageContent, error: false };
     } catch (error: any) {
-      logger.error("Error generating response from OpenAI:", error);
+      logger.error("Error generating response from OpenAI:", error?.message);
       return {
         error: true,
         message: error.message || "Unknown OpenAI API error",

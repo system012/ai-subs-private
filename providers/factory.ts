@@ -11,9 +11,10 @@ export function createLLMProvider(): LLMProvider {
       console.log("Using OpenAI provider.");
       return new OpenAIProvider();
     case "ollama":
-      console.log("Using Ollama provider.");
+      console.log(`Using Ollama provider.`);
       return new OllamaProvider();
     default:
       throw new Error(`Unsupported LLM provider: ${config.provider}`);
   }
 }
+

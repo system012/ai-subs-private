@@ -1,8 +1,23 @@
-import ollama from "ollama";
+import { Ollama } from "ollama";
 import type { LLMProvider, GenerateParams, GenerateResult } from "./types";
 import { systemPrompt } from "../prompts";
 
 export class OllamaProvider implements LLMProvider {
+  private client: Ollama;
+
+  constructor() {
+    const apiKey = process.env.LLM_API_KEY;
+    if (!apiKey) throw new Error("Api key is required!");
+
+    const baseURL = process.env.LLM_API_URL;
+    if (!baseURL) throw new Error("LLM_API_URL is required");
+
+    this.client = new Ollama({
+      host: baseURL,
+      ...(apiKey && { headers: { Authorization: `Bearer ${apiKey}` } }),
+    });
+  }
+
   async generate({
     content,
     logger,
@@ -18,7 +33,7 @@ export class OllamaProvider implements LLMProvider {
         promptAddendum: promptAddendum || "none",
       });
 
-      const response = await ollama.generate({
+      const response = await this.client.generate({
         model,
         system: `${systemPrompt}\n${promptAddendum}`,
         prompt: content,

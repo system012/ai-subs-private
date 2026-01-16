@@ -20,23 +20,23 @@ export const getConfig = () => {
     .requiredOption("-i, --input <path>", "Input file path")
     .requiredOption("-o, --output <path>", "Output file path")
     .option("-d, --debug", "Enable debugging", false)
-    .option("-m, --model <model>", "Model to use", "gemini-2.0-flash")
-    // .option("-m, --model <model>", "Model to use", "gemini-2.5-flash")
+    .option("-m, --model <model>", "Model to use", "gemini-2.5-flash")
+    // .option(
+    //   "-m, --model <model>",
+    //   "Model to use",
+    //   "gemini-3-flash-preview:cloud",
+    // )
     .option(
       "--fallback-models <models>",
       "Comma-separated list of fallback models",
       (value) => value.split(","),
-      [
-        "gemini-2.5-flash",
-        "gemini-2.0-flash-preview-image-generation",
-        "gemini-1.5-flash",
-        "gemini-2.5-flash-lite-preview-06-17",
-      ],
+      ["gemma-3-27b", "gemini-2.5-flash"],
     )
     .option(
       "-p, --provider <provider>",
       "LLM provider to use (openai or ollama)",
       (value) => value.toLowerCase(),
+      // "ollama",
       "openai",
     )
     .option(
