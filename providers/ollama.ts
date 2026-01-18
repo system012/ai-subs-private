@@ -24,8 +24,13 @@ export class OllamaProvider implements LLMProvider {
     promptAddendum = "",
     temperature = 0.7,
     model,
+    signal,
   }: GenerateParams): Promise<GenerateResult> {
     try {
+      if (signal?.aborted) {
+        return { error: true, message: "Operation aborted", status: 0 };
+      }
+
       logger.debug("Sending request to Ollama", {
         model,
         temperature,
@@ -47,10 +52,14 @@ export class OllamaProvider implements LLMProvider {
       });
       return { value: response.response, error: false };
     } catch (error: any) {
+      if (signal?.aborted && error.message === "Operation aborted") {
+        return { error: true, message: "Operation aborted", status: 0 };
+      }
       logger.error("Error generating response from Ollama:", error);
       return {
         error: true,
         message: error.message || "Unknown Ollama error",
+        status: error.status || 0,
       };
     }
   }

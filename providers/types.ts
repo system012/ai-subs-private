@@ -17,6 +17,7 @@ export type GenerateParams = {
   promptAddendum?: string;
   temperature?: number;
   model: string;
+  signal?: AbortSignal;
 };
 
 export interface LLMProvider {

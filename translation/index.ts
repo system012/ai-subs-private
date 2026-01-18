@@ -18,11 +18,13 @@ export async function translate({
   promptAddendum,
   logger,
   provider,
+  signal,
 }: {
   chunk: Chunk;
   promptAddendum?: string;
   logger: ReturnType<typeof createLogger>;
   provider: LLMProvider;
+  signal?: AbortSignal;
 }): Promise<{
   translated: SubtitleT[];
   type: "error" | "success" | "error-queue";
@@ -31,6 +33,8 @@ export async function translate({
   const config = getConfig();
   let generateResult;
   for (const model of [config.model, ...config.fallbackModels]) {
+    if (signal?.aborted) break;
+
     generateResult = await retry(
       () =>
         provider.generate({
@@ -38,14 +42,18 @@ export async function translate({
           logger,
           promptAddendum,
           model: model,
+          signal,
         }),
       {
         maxAttempts: 10,
         initialDelay: 3000,
+        signal,
       },
     );
 
     if (!generateResult.error) break;
+
+    if (signal?.aborted) break;
 
     logger.warn(
       `error persisting after retrying, switching to next model: ${model}`,
@@ -53,6 +61,15 @@ export async function translate({
   }
 
   if (!generateResult || generateResult?.error) {
+    if (signal?.aborted) {
+      logger.log("Translation aborted by signal.");
+      return {
+        translated: [],
+        type: "error",
+        prompt: "",
+      };
+    }
+
     logger.error(
       "LLM provider failed to generate translation:",
       generateResult?.message || "No value returned",

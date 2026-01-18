@@ -54,6 +54,10 @@ export class Project {
     this.logger = createLogger(true);
   }
 
+  get isDone() {
+    return this.state.value.every((item) => item.status === "done");
+  }
+
   save(content: StateItem<Chunk>) {
     this.state.value.splice(content.value.id, 1, content);
     writeFile(this.stateFile, JSON.stringify(this.state, null, 2));
@@ -84,12 +88,20 @@ export class Project {
     return this;
   }
 
-  async processErrors(processor: typeof errorProcessor, provider: LLMProvider) {
+  async processErrors(
+    processor: typeof errorProcessor,
+    provider: LLMProvider,
+    signal?: AbortSignal,
+  ) {
     this.logger?.log("Processing errors...");
 
     const errorItems = this.state.errors;
     this.logger?.log(`Errors found: ${errorItems.length}`);
     for (const [index, item] of errorItems.entries()) {
+      if (signal?.aborted) {
+        this.logger?.log("Stopping error processing due to shutdown signal.");
+        break;
+      }
       this.logger?.log(
         `Processing error ${index + 1} out of ${errorItems.length}`,
       );

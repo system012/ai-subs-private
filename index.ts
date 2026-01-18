@@ -9,12 +9,15 @@ import { errorProcessor } from "./utils/error-processor";
 import { getConfig } from "./config/get-config";
 import * as dotenv from "dotenv";
 import { createLLMProvider } from "./providers/factory";
+import { GracefulShutdownManager } from "./utils/shutdown";
 
 dotenv.config();
 
 async function main() {
   const config = getConfig();
   const logger = createLogger(config.debug);
+  const shutdownManager = new GracefulShutdownManager(logger);
+
   const project = new Project(
     config.input,
     config.output,
@@ -29,6 +32,8 @@ async function main() {
   console.time("translation");
 
   for (const [index, chunk] of project.chunks.entries()) {
+    if (shutdownManager.isShutdownRequested) break;
+
     logger.log(
       `Translating chunk ${index + 1} out of ${project.chunks.length}. Chunk ID: ${chunk.id}`,
     );
@@ -55,7 +60,18 @@ async function main() {
     );
   }
 
-  await project.processErrors(errorProcessor, provider);
+  await project.processErrors(errorProcessor, provider, shutdownManager.signal);
+
+  if (shutdownManager.isShutdownRequested) {
+    if (!project.isDone) {
+      logger.log("Graceful shutdown complete (project incomplete).");
+      process.exit(130);
+    }
+    project.complete();
+    logger.log("Graceful shutdown complete.");
+    return;
+  }
+
   project.complete();
 
   logger.debug(`Translation generated successfully for file: ${config.input}`);

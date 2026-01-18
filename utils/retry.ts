@@ -2,19 +2,12 @@ import { createLogger } from "./logger";
 
 const logger = createLogger(false);
 
-/**
- * Delays execution for a specified number of milliseconds.
- * @param ms - The number of milliseconds to wait.
- * @returns A promise that resolves after the delay.
- */
-const delay = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
-
 type RetryableResult = { error: true; message: string } | { error: false; };
 type RetryOptions = {
   maxAttempts?: number;
   initialDelay?: number;
   maxDelay?: number;
+  signal?: AbortSignal;
 };
 
 /**
@@ -31,6 +24,7 @@ export async function retry<T extends RetryableResult>(
     maxAttempts = 3,
     initialDelay = 1000,
     maxDelay = 30000,
+    signal,
   }: RetryOptions = {
       maxAttempts: 3,
       initialDelay: 1000,
@@ -41,6 +35,13 @@ export async function retry<T extends RetryableResult>(
   let currentDelay = initialDelay;
 
   while (attempts < maxAttempts) {
+    if (signal?.aborted) {
+      return {
+        error: true,
+        message: "Operation aborted",
+      } as T;
+    }
+
     attempts++;
     try {
       logger.debug(`Attempt ${attempts} of ${maxAttempts}...`);
@@ -53,6 +54,13 @@ export async function retry<T extends RetryableResult>(
 
       return result;
     } catch (error: any) {
+      if (signal?.aborted) {
+        return {
+          error: true,
+          message: "Operation aborted",
+        } as T;
+      }
+
       logger.warn(`Attempt ${attempts} failed: ${error.message}`);
 
       if (attempts >= maxAttempts) {
@@ -65,7 +73,21 @@ export async function retry<T extends RetryableResult>(
 
       const backoffDelay = Math.min(currentDelay, maxDelay);
       logger.debug(`Retrying in ${backoffDelay}ms...`);
-      await delay(backoffDelay);
+      
+      await new Promise<void>((resolve) => {
+        const timeout = setTimeout(() => {
+          resolve();
+          signal?.removeEventListener('abort', onAbort);
+        }, backoffDelay);
+
+        const onAbort = () => {
+          clearTimeout(timeout);
+          resolve();
+        };
+
+        signal?.addEventListener('abort', onAbort, { once: true });
+      });
+      
       currentDelay *= 2;
     }
   }

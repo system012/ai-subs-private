@@ -31,8 +31,13 @@ export class OpenAIProvider implements LLMProvider {
     promptAddendum = "",
     temperature = 0.7,
     model,
+    signal,
   }: GenerateParams): Promise<GenerateResult> {
     try {
+      if (signal?.aborted) {
+        return { error: true, message: "Operation aborted", status: 0 };
+      }
+
       logger.debug("Sending request to OpenAI", {
         model,
         temperature,

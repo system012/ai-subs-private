@@ -7,7 +7,7 @@ type Config = {
   debug: boolean;
   model: string;
   fallbackModels: string[];
-  provider: "openai" | "ollama";
+  provider: "openai" | "ollama" | "claude-code" | "gemini";
   maxProjectFolders: number;
 };
 
@@ -20,7 +20,9 @@ export const getConfig = () => {
     .requiredOption("-i, --input <path>", "Input file path")
     .requiredOption("-o, --output <path>", "Output file path")
     .option("-d, --debug", "Enable debugging", false)
-    .option("-m, --model <model>", "Model to use", "gemini-2.5-flash")
+    .option("-m, --model <model>", "Model to use", "gemini-3-flash-preview")
+    // .option("-m, --model <model>", "Model to use", "gemini-2.5-flash")
+    // .option("-m, --model <model>", "Model to use", "haiku")
     // .option(
     //   "-m, --model <model>",
     //   "Model to use",
@@ -30,14 +32,16 @@ export const getConfig = () => {
       "--fallback-models <models>",
       "Comma-separated list of fallback models",
       (value) => value.split(","),
-      ["gemma-3-27b", "gemini-2.5-flash"],
+      ["gemini-2.5-flash", "gemini-2.5-flash-lite"],
     )
     .option(
       "-p, --provider <provider>",
-      "LLM provider to use (openai or ollama)",
+      "LLM provider to use (openai, ollama, claude-code, or gemini)",
       (value) => value.toLowerCase(),
+      "gemini",
       // "ollama",
-      "openai",
+      // "claude-code",
+      // "openai",
     )
     .option(
       "--max-project-folders <number>",
@@ -48,8 +52,12 @@ export const getConfig = () => {
     .parse(process.argv)
     .opts();
 
-  if (!["openai", "ollama"].includes(config.provider)) {
-    console.error("Invalid provider specified. Use 'openai' or 'ollama'.");
+  if (
+    !["openai", "ollama", "claude-code", "gemini"].includes(config.provider)
+  ) {
+    console.error(
+      "Invalid provider specified. Use 'openai', 'ollama', 'claude-code', or 'gemini'.",
+    );
     process.exit(1);
   }
 
