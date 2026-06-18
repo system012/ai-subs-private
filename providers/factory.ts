@@ -4,6 +4,7 @@ import { OpenAIProvider } from "./openai";
 import { OllamaProvider } from "./ollama";
 import { ClaudeCodeProvider } from "./claude-code";
 import { GeminiCliProvider } from "./gemini-cli";
+import { OpencodeProvider } from "./opencode";
 
 export function createLLMProvider(): LLMProvider {
   const config = getConfig();
@@ -21,6 +22,9 @@ export function createLLMProvider(): LLMProvider {
     case "gemini":
       console.log("Using Gemini CLI provider.");
       return new GeminiCliProvider();
+    case "opencode":
+      console.log("Using opencode provider.");
+      return new OpencodeProvider();
     default:
       throw new Error(`Unsupported LLM provider: ${config.provider}`);
   }

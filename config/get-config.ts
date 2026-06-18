@@ -7,7 +7,7 @@ type Config = {
   debug: boolean;
   model: string;
   fallbackModels: string[];
-  provider: "openai" | "ollama" | "claude-code" | "gemini";
+  provider: "openai" | "ollama" | "claude-code" | "gemini" | "opencode";
   maxProjectFolders: number;
 };
 
@@ -15,12 +15,13 @@ let config: Config;
 
 export const getConfig = () => {
   if (config) return config;
-
+  // gemini-2.5-pro
   config = program
     .requiredOption("-i, --input <path>", "Input file path")
     .requiredOption("-o, --output <path>", "Output file path")
     .option("-d, --debug", "Enable debugging", false)
-    .option("-m, --model <model>", "Model to use", "gemini-3-flash-preview")
+    // .option("-m, --model <model>", "Model to use", "gemini-3-flash-preview")
+    // .option("-m, --model <model>", "Model to use", "gemini-2.5-pro")
     // .option("-m, --model <model>", "Model to use", "gemini-2.5-flash")
     // .option("-m, --model <model>", "Model to use", "haiku")
     // .option(
@@ -28,6 +29,7 @@ export const getConfig = () => {
     //   "Model to use",
     //   "gemini-3-flash-preview:cloud",
     // )
+    .option("-m, --model <model>", "Model to use", "opencode/big-pickle")
     .option(
       "--fallback-models <models>",
       "Comma-separated list of fallback models",
@@ -36,9 +38,10 @@ export const getConfig = () => {
     )
     .option(
       "-p, --provider <provider>",
-      "LLM provider to use (openai, ollama, claude-code, or gemini)",
+      "LLM provider to use (openai, ollama, claude-code, gemini, or opencode)",
       (value) => value.toLowerCase(),
-      "gemini",
+      "opencode",
+      // "gemini",
       // "ollama",
       // "claude-code",
       // "openai",
@@ -53,10 +56,12 @@ export const getConfig = () => {
     .opts();
 
   if (
-    !["openai", "ollama", "claude-code", "gemini"].includes(config.provider)
+    !["openai", "ollama", "claude-code", "gemini", "opencode"].includes(
+      config.provider,
+    )
   ) {
     console.error(
-      "Invalid provider specified. Use 'openai', 'ollama', 'claude-code', or 'gemini'.",
+      "Invalid provider specified. Use 'openai', 'ollama', 'claude-code', 'gemini', or 'opencode'.",
     );
     process.exit(1);
   }

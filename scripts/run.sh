@@ -1,10 +1,9 @@
 #!/bin/bash
 
 # Check if gum is installed
-if ! command -v gum &> /dev/null
-then
-    echo "Error: gum is not installed. Please install it (https://github.com/charmbracelet/gum) to use this script."
-    exit 1
+if ! command -v gum &>/dev/null; then
+  echo "Error: gum is not installed. Please install it (https://github.com/charmbracelet/gum) to use this script."
+  exit 1
 fi
 
 # Define the subs directory and the output directory
@@ -40,11 +39,11 @@ sorted_paths_output=$(echo "$raw_stat_output" | sort -nr | cut -d' ' -f2-)
 
 sorted_files=()
 while IFS= read -r line; do
-    # Add to array only if the line is not empty
-    if [[ -n "$line" ]]; then
-        sorted_files+=("$line")
-    fi
-done <<< "$sorted_paths_output"
+  # Add to array only if the line is not empty
+  if [[ -n "$line" ]]; then
+    sorted_files+=("$line")
+  fi
+done <<<"$sorted_paths_output"
 
 # Check if any .srt files were found
 if [ ${#sorted_files[@]} -eq 0 ]; then
@@ -78,8 +77,8 @@ done
 
 # Double-check if we found the full path (should always work if selection wasn't cancelled)
 if [ -z "$selected_file" ]; then
-    gum style --foreground 197 "Error: Could not map selected display name back to file path."
-    exit 1
+  gum style --foreground 197 "Error: Could not map selected display name back to file path."
+  exit 1
 fi
 
 # Construct the output filename
@@ -104,5 +103,7 @@ if [ $exit_code -eq 0 ]; then
 else
   gum style --foreground 197 "Translation process failed with exit code $exit_code."
 fi
+
+echo "end-of-my-process"
 
 exit $exit_code
