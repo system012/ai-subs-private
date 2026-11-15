@@ -1,0 +1,34 @@
+name: release
+# Tag vX.Y.Z on a commit of master → tests → linux binary → GitHub release with SHA256SUMS.
+# putio-subs pins a release in its versions.conf (AI_SUBS_VERSION) and installs ai-subs-linux-x64 from it.
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: read
+jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+  release:
+    needs: test
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Tag must be on master
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/master
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: bun install --frozen-lockfile
+      - name: Build
+        run: |
+          bun build index.ts --compile --target=bun-linux-x64 --outfile ai-subs-linux-x64
+          sha256sum ai-subs-linux-x64 > SHA256SUMS
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" ai-subs-linux-x64 SHA256SUMS --generate-notes
