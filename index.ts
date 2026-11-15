@@ -50,9 +50,8 @@ async function main() {
       continue;
     }
     if (type === "error") {
-      logger.error("Error generating translations");
       console.timeEnd("translation");
-      return;
+      throw new Error(`Error generating translation for chunk ${chunk.id}`);
     }
 
     project.save(
@@ -72,10 +71,17 @@ async function main() {
     return;
   }
 
+  if (!project.isDone) {
+    throw new Error("Translation incomplete: output not written");
+  }
+
   project.complete();
 
   logger.debug(`Translation generated successfully for file: ${config.input}`);
   console.timeEnd("translation");
 }
 
-main();
+main().catch((error: unknown) => {
+  console.error(error instanceof Error ? error.message : error);
+  process.exit(1);
+});
