@@ -188,3 +188,6 @@ output
 # LLM
 
 .gemini
+
+# bun build --compile temp files
+*.bun-build
