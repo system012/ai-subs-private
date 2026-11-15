@@ -1,5 +1,16 @@
 import { program } from "commander";
 import { DEFAULT_MAX_PROJECT_FOLDERS } from "../utils/constants";
+import { REASONING_EFFORTS, type ReasoningEffort } from "../providers/codex";
+
+export const PROVIDERS = [
+  "openai",
+  "ollama",
+  "claude-code",
+  "gemini",
+  "opencode",
+  "codex",
+] as const;
+export type Provider = (typeof PROVIDERS)[number];
 
 type Config = {
   input: string;
@@ -7,7 +18,8 @@ type Config = {
   debug: boolean;
   model: string;
   fallbackModels: string[];
-  provider: "openai" | "ollama" | "claude-code" | "gemini" | "opencode";
+  provider: Provider;
+  reasoningEffort: ReasoningEffort;
   maxProjectFolders: number;
 };
 
@@ -29,22 +41,28 @@ export const getConfig = () => {
     //   "Model to use",
     //   "gemini-3-flash-preview:cloud",
     // )
-    .option("-m, --model <model>", "Model to use", "opencode/big-pickle")
+    .option("-m, --model <model>", "Model to use", "gpt-6-luna")
     .option(
       "--fallback-models <models>",
       "Comma-separated list of fallback models",
       (value) => value.split(","),
-      ["gemini-2.5-flash", "gemini-2.5-flash-lite"],
+      ["gpt-5.6-luna"],
     )
     .option(
       "-p, --provider <provider>",
-      "LLM provider to use (openai, ollama, claude-code, gemini, or opencode)",
+      `LLM provider to use (${PROVIDERS.join(", ")})`,
       (value) => value.toLowerCase(),
-      "opencode",
+      "codex",
       // "gemini",
       // "ollama",
       // "claude-code",
       // "openai",
+    )
+    .option(
+      "--reasoning-effort <level>",
+      `Reasoning effort, codex provider only (${REASONING_EFFORTS.join(", ")})`,
+      (value) => value.toLowerCase(),
+      "low",
     )
     .option(
       "--max-project-folders <number>",
@@ -55,13 +73,17 @@ export const getConfig = () => {
     .parse(process.argv)
     .opts();
 
+  if (!(PROVIDERS as readonly string[]).includes(config.provider)) {
+    console.error(
+      `Invalid provider specified. Use one of: ${PROVIDERS.join(", ")}.`,
+    );
+    process.exit(1);
+  }
   if (
-    !["openai", "ollama", "claude-code", "gemini", "opencode"].includes(
-      config.provider,
-    )
+    !(REASONING_EFFORTS as readonly string[]).includes(config.reasoningEffort)
   ) {
     console.error(
-      "Invalid provider specified. Use 'openai', 'ollama', 'claude-code', 'gemini', or 'opencode'.",
+      `Invalid reasoning effort. Use one of: ${REASONING_EFFORTS.join(", ")}.`,
     );
     process.exit(1);
   }
